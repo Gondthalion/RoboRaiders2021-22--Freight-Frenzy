@@ -16,10 +16,9 @@ public class MaximusPrimeTele extends OpMode {
     @Override
     public void loop() {
         if (!timerRestarted) {
-            base.teleopTimer.reset();
+            base.tmrTeleop.reset();
             timerRestarted = true;
         }
-        base.DeliverBlockTele();
         base.DriverControls();
         base.OperatorControls();
         base.UpdateDriveTrain();

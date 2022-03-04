@@ -6,7 +6,6 @@ import com.qualcomm.robotcore.hardware.CRServo;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DistanceSensor;
 import com.qualcomm.robotcore.hardware.NormalizedColorSensor;
-import com.qualcomm.robotcore.hardware.SwitchableLight;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
@@ -18,42 +17,44 @@ import org.firstinspires.ftc.robotcore.external.navigation.Orientation;
 class MaximusPrimeBase {
     OpMode opMode;
     // Motor declaration
-    DcMotor collectionM, liftM, lSpinnerM, rSpinnerM,
-            lfDrivetrainM, rfDrivetrainM, lbDrivetrainM, rbDrivetrainM;
+    DcMotor dcmCollection, dcmLift, dcmSpinnerR,
+            dcmDrivetrainLF, dcmDrivetrainRF, dcmDrivetrainLB, dcmDrivetrainRB, dcmCapping;
     // Servo declaration
-    CRServo deliveryS;
+    CRServo crsDelivery;
     // IMU setup
     BNO055IMU imu;
     Orientation angles;
-    NormalizedColorSensor collectionColorSensor;
+    NormalizedColorSensor csCollection;
     // Timers
-    ElapsedTime genericTimer = new ElapsedTime();
-    ElapsedTime teleopTimer = new ElapsedTime();
-    ElapsedTime imuTimer = new ElapsedTime();
-    ElapsedTime encoderDriveTimer = new ElapsedTime();
-    ElapsedTime collectionTimer = new ElapsedTime();
-    ElapsedTime carouselTeleTimer = new ElapsedTime();
+    ElapsedTime tmrGeneric = new ElapsedTime();
+    ElapsedTime tmrTeleop = new ElapsedTime();
+    ElapsedTime tmrIMU = new ElapsedTime();
+    ElapsedTime tmrEncoderDrive = new ElapsedTime();
+    ElapsedTime tmrCarouselTele = new ElapsedTime();
     /*          AUTONOMOUS AND TELEOP VARIABLES         */
-    // Deliver block variables
-    LiftAvailability liftAvailability = LiftAvailability.OFF;
-
-    private enum LiftAvailability{
-        LOW, RAISING, DELIVERING, LOWERING, OFF
-    }
-    int highGoalTicks = 4200;
-    int middleGoalTicks = 2200;
-    int lowGoalTicks = 1000;
-    int restingPositionTicks = 100;
-    int liftTargetHeightTicks = lowGoalTicks;
-    // Enumerator for determining alliance and autonomous positions
     Alliance alliance = Alliance.BLUE1;
     private enum Alliance{
         RED1, RED2, BLUE1, BLUE2
     }
     float IMUReading = 0;
-    boolean autoTurnEnabled = false;
     /*                TELEOP VARIABLES               */
+    TingleBombs tingleBombs = TingleBombs.UP_FREIGHT;
+    private enum TingleBombs{
+        UP_FREIGHT,
+        UP_TSE,
+        DELIVERING_FREIGHT,
+        DELIVERING_TSE
+    }
+    boolean bCollectedBlock = false;
+    int iRestingTicks = 100;
+    int iPickingFreightTicks = 300;
+    int iPickingTSETicks = 400;
+    int iDeliveringFreightTicks = 900;
+    int iDeliveringTSETicks = 1200;
+    int iTargetTicks = iRestingTicks;
+
     double carouselTimerOffset = 0;
+    boolean autoTurnEnabled = false;
     // Variables used in determining drivetrain speed
     double drvTrnSpd = .75;
     boolean upFlag = false;
@@ -79,9 +80,7 @@ class MaximusPrimeBase {
     private enum AutonomousTargetLevel {
         HIGH, MIDDLE, LOW
     }
-
-
-    double power = 0;
+    double carouselPower = 0;
     // Link classes and run the configuration function
     public MaximusPrimeBase(OpMode theOpMode){
         opMode = theOpMode;
@@ -90,45 +89,38 @@ class MaximusPrimeBase {
     /*Teleop Functions*/
     public void OperatorControls() {                                                                // Operator Controls
         // Turn off the automatic the lift if the joystick is used
-        if (opMode.gamepad2.left_stick_y > .5 || opMode.gamepad2.left_stick_y < -.5) {
-            liftAvailability = LiftAvailability.OFF;
-        }
         // Lift controls.
-        liftM.setPower(-opMode.gamepad2.left_stick_y);
+        dcmLift.setPower(-opMode.gamepad2.left_stick_y);
         // Collection controls.
-        collectionM.setPower(opMode.gamepad2.right_stick_y);
+        dcmCollection.setPower(opMode.gamepad2.right_stick_y);
         // Open/close delivery servo
         if (opMode.gamepad2.y) {
-            deliveryS.setPower(1);
+            crsDelivery.setPower(1);
         } else if (opMode.gamepad2.x) {
-            deliveryS.setPower(-1);
+            crsDelivery.setPower(-1);
         } else {
-            deliveryS.setPower(0);
+            crsDelivery.setPower(0);
         }
     }
     public void CarouselTele() {
-        if (carouselTeleTimer.seconds()<.2) {
-            power = 1;
+        if (tmrCarouselTele.seconds()>1) {
+            carouselPower = 1;
         } else {
-            power = .5;
+            carouselPower = .35;
         }
         if (alliance == Alliance.BLUE1 || alliance == Alliance.BLUE2) {
             if (opMode.gamepad1.left_bumper) {
-                lSpinnerM.setPower(-power);
-                rSpinnerM.setPower(-power);
+                dcmSpinnerR.setPower(carouselPower);
             } else {
-                lSpinnerM.setPower(0);
-                rSpinnerM.setPower(0);
-                carouselTeleTimer.reset();
+                dcmSpinnerR.setPower(0);
+                tmrCarouselTele.reset();
             }
         } else {
             if (opMode.gamepad1.left_bumper) {
-                lSpinnerM.setPower(power);
-                rSpinnerM.setPower(power);
+                dcmSpinnerR.setPower(-carouselPower);
             } else {
-                lSpinnerM.setPower(0);
-                rSpinnerM.setPower(0);
-                carouselTeleTimer.reset();
+                dcmSpinnerR.setPower(0);
+                tmrCarouselTele.reset();
             }
         }
     }
@@ -157,63 +149,15 @@ class MaximusPrimeBase {
             downPersistent = true;
         }
     }
-    public void DeliverBlockTele() {                                                                // Deliver block tele
-        // Reset home encoder reading if dpad right is pressed
-        if (opMode.gamepad2.dpad_right) {
-            liftM.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-            liftM.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-        }
-        // Turn on automatic delivery and set target location to the low, middle or
-        // high goals based on what dpad button is pressed
+    public void AutoCapping() {
         if (opMode.gamepad2.dpad_down) {
-            liftTargetHeightTicks = lowGoalTicks;
-            liftAvailability = LiftAvailability.LOW;
-        } else if (opMode.gamepad2.dpad_left) {
-            liftTargetHeightTicks = middleGoalTicks;
-            liftAvailability = LiftAvailability.LOW;
-        } else if (opMode.gamepad2.dpad_up) {
-            liftTargetHeightTicks = highGoalTicks;
-            liftAvailability = LiftAvailability.LOW;
+            iTargetTicks = iPickingFreightTicks;
         }
 
-        // State machine to deliver the freight without any loops
-        switch (liftAvailability) {
-            // If the lift is low/unactivated and one of the dpad
-            // buttons is pressed, begin raising the lift
-            case LOW:
-                if (opMode.gamepad2.dpad_down || opMode.gamepad2.dpad_left
-                        || opMode.gamepad2.dpad_up) {
-                    liftM.setPower(1);
-                    liftAvailability = LiftAvailability.RAISING;
-                }
-                break;
-            // If the lift has reached it's target position, begin delivering the freight
-            case RAISING:
-                if (liftM.getCurrentPosition() > liftTargetHeightTicks) {
-                    liftM.setPower(0);
-                    deliveryS.setPower(1);
-                    genericTimer.reset();
-                    liftAvailability = LiftAvailability.DELIVERING;
-                }
-                break;
-            // After the servo has been open for two seconds,
-            // close the delivery and lower the lift
-            case DELIVERING:
-                if (genericTimer.seconds() > 1 &&
-                        liftAvailability == LiftAvailability.DELIVERING) {
-                    deliveryS.setPower(0);
-                    liftM.setPower(-1);
-                    liftAvailability = LiftAvailability.LOWERING;
-                }
-                break;
-            // Once the lift reaches the low position, stop the motor
-            // and allow for this switch statement to begin again
-            case LOWERING:
-                if (liftM.getCurrentPosition() < restingPositionTicks) {
-                    liftM.setPower(0);
-                    liftAvailability = LiftAvailability.LOW;
-                }
-                break;
+        if (opMode.gamepad2.dpad_down || opMode.gamepad2.dpad_left || opMode.gamepad2.dpad_up || opMode.gamepad2.dpad_right) {
+            switch (tingleBombs) {
+                case UP_FREIGHT:
+            }
         }
     }
     void TeleIMUTurn() {                                                                            // Teleop IMU turn
@@ -276,25 +220,25 @@ class MaximusPrimeBase {
             }
         }
         if (!autoTurnEnabled) {
-            lfDrivetrainM.setPower((((speed * -(Math.sin(angle)) + turnPower))) * drvTrnSpd);
-            lbDrivetrainM.setPower((((speed * -(Math.cos(angle)) + turnPower))) * drvTrnSpd);
-            rfDrivetrainM.setPower((((speed * (Math.cos(angle))) + turnPower)) * drvTrnSpd);
-            rbDrivetrainM.setPower((((speed * (Math.sin(angle))) + turnPower)) * drvTrnSpd);
+            dcmDrivetrainLF.setPower((((speed * -(Math.sin(angle)) + turnPower))) * drvTrnSpd);
+            dcmDrivetrainLB.setPower((((speed * -(Math.cos(angle)) + turnPower))) * drvTrnSpd);
+            dcmDrivetrainRF.setPower((((speed * (Math.cos(angle))) + turnPower)) * drvTrnSpd);
+            dcmDrivetrainRB.setPower((((speed * (Math.sin(angle))) + turnPower)) * drvTrnSpd);
         }
     }
     /*Autonomous Functions*/
     public void EncoderDrive(double inToMove, double maxSpeedDistance,                              // Encoder drive
                              double minSpeed, float timeOut, int headingOffset) {
         // Reset the stall out timer
-        encoderDriveTimer.reset();
+        tmrEncoderDrive.reset();
         // Reset the encoders before moving
         ResetEncoders();
         // Find the average of the encoders on the left side of the drivetrain
-        leftSideEncoderAverage = (((lbDrivetrainM.getCurrentPosition()) +
-                (lfDrivetrainM.getCurrentPosition()))/2);
+        leftSideEncoderAverage = (((dcmDrivetrainLB.getCurrentPosition()) +
+                (dcmDrivetrainLF.getCurrentPosition()))/2);
         // Find the average of the encoders on the right side of the drivetrain
-        rightSideEncoderAverage = -(((rbDrivetrainM.getCurrentPosition()) +
-                (rfDrivetrainM.getCurrentPosition()))/2);
+        rightSideEncoderAverage = -(((dcmDrivetrainRB.getCurrentPosition()) +
+                (dcmDrivetrainRF.getCurrentPosition()))/2);
         // We divide a number by this variable, so this make division by zero impossible
         if (leftSideEncoderAverage == 0) {
             leftSideEncoderAverage = 1;
@@ -304,20 +248,27 @@ class MaximusPrimeBase {
             rightSideEncoderAverage = 1;
         }
         // Find the average of the entire drivetrain
-        currentLinearPositionInInches = ((leftSideEncoderAverage + rightSideEncoderAverage)/2)/ticksPerInch;
+        currentLinearPositionInInches =
+                ((leftSideEncoderAverage + rightSideEncoderAverage)/2)/ticksPerInch;
 
         // The important part says to keep moving until the
         // current position is grater than the target position
         while (((LinearOpMode)opMode).opModeIsActive() && Math.abs(currentLinearPositionInInches) <
-                Math.abs(inToMove) && encoderDriveTimer.seconds() < timeOut) {
+                Math.abs(inToMove) && tmrEncoderDrive.seconds() < timeOut) {
+            UpdateColorSensor();
+            if (collectionDistanceSensorReading < 1.35) {
+                dcmCollection.setPower(0);
+                bCollectedBlock = true;
+            }
             // Find the average of the encoders on the left side of the drivetrain
-            leftSideEncoderAverage = (((lbDrivetrainM.getCurrentPosition()) +
-                    (lfDrivetrainM.getCurrentPosition()))/2);
+            leftSideEncoderAverage = (((dcmDrivetrainLB.getCurrentPosition()) +
+                    (dcmDrivetrainLF.getCurrentPosition()))/2);
             // Find the average of the encoders on the right side of the drivetrain
-            rightSideEncoderAverage = -(((rbDrivetrainM.getCurrentPosition()) +
-                    (rfDrivetrainM.getCurrentPosition()))/2);
+            rightSideEncoderAverage = -(((dcmDrivetrainRB.getCurrentPosition()) +
+                    (dcmDrivetrainRF.getCurrentPosition()))/2);
             // Updating current pos.
-            currentLinearPositionInInches = ((leftSideEncoderAverage + rightSideEncoderAverage)/2)/ticksPerInch;
+            currentLinearPositionInInches =
+                    ((leftSideEncoderAverage + rightSideEncoderAverage)/2)/ticksPerInch;
             // We divide a number by this variable, so this make division by zero impossible
             if (leftSideEncoderAverage == 0) {
                 leftSideEncoderAverage = 1;
@@ -328,7 +279,8 @@ class MaximusPrimeBase {
             }
 
             // Constantly updating the power to the motors based on how far we have to move.
-            double power = Math.max(Math.abs(currentLinearPositionInInches -inToMove)/maxSpeedDistance, minSpeed);
+            double power = Math.max(Math.abs(currentLinearPositionInInches - inToMove)
+                    /maxSpeedDistance, minSpeed);
             // Update our current heading
             angles = imu.getAngularOrientation
                     (AxesReference.INTRINSIC, AxesOrder.ZYX, AngleUnit.DEGREES);
@@ -372,17 +324,17 @@ class MaximusPrimeBase {
     public void EncoderDriveSideways(double inToMove, double maxSpeedDistance,                      // Encoder Drive Sideways
                                      double minSpeed, float timeOut, int headingOffset) {
         // SEE ENCODERDRIVE FOR DOCUMENTATION
-        encoderDriveTimer.reset();
+        tmrEncoderDrive.reset();
         ResetEncoders();
 
         angles = imu.getAngularOrientation
                 (AxesReference.INTRINSIC, AxesOrder.ZYX, AngleUnit.DEGREES);
         IMUReading = (angles.firstAngle);
 
-        frontSideEncoderAverage = (((rfDrivetrainM.getCurrentPosition()) +
-                (lfDrivetrainM.getCurrentPosition()))/2);
-        rightSideEncoderAverage = -(((rbDrivetrainM.getCurrentPosition()) +
-                (lbDrivetrainM.getCurrentPosition()))/2);
+        frontSideEncoderAverage = (((dcmDrivetrainRF.getCurrentPosition()) +
+                (dcmDrivetrainLF.getCurrentPosition()))/2);
+        rightSideEncoderAverage = -(((dcmDrivetrainRB.getCurrentPosition()) +
+                (dcmDrivetrainLB.getCurrentPosition()))/2);
 
         if (frontSideEncoderAverage == 0) {
             frontSideEncoderAverage = 1;
@@ -390,14 +342,16 @@ class MaximusPrimeBase {
         if (backSideEncoderAverage == 0) {
             backSideEncoderAverage = 1;
         }
-        currentLinearPositionInInches = ((frontSideEncoderAverage + backSideEncoderAverage)/2)/ticksPerInch;
+        currentLinearPositionInInches =
+                ((frontSideEncoderAverage + backSideEncoderAverage)/2)/ticksPerInch;
         while (((LinearOpMode)opMode).opModeIsActive() && Math.abs(currentLinearPositionInInches) <
-                Math.abs(inToMove) && encoderDriveTimer.seconds() < timeOut) {
-            frontSideEncoderAverage = (((rfDrivetrainM.getCurrentPosition()) +
-                    (lfDrivetrainM.getCurrentPosition()))/2);
-            rightSideEncoderAverage = -(((rbDrivetrainM.getCurrentPosition()) +
-                    (lbDrivetrainM.getCurrentPosition()))/2);
-            currentLinearPositionInInches = ((frontSideEncoderAverage + backSideEncoderAverage)/2)/ticksPerInch;
+                Math.abs(inToMove) && tmrEncoderDrive.seconds() < timeOut) {
+            frontSideEncoderAverage = (((dcmDrivetrainRF.getCurrentPosition()) +
+                    (dcmDrivetrainLF.getCurrentPosition()))/2);
+            rightSideEncoderAverage = -(((dcmDrivetrainRB.getCurrentPosition()) +
+                    (dcmDrivetrainLB.getCurrentPosition()))/2);
+            currentLinearPositionInInches =
+                    ((frontSideEncoderAverage + backSideEncoderAverage)/2)/ticksPerInch;
             if (frontSideEncoderAverage == 0) {
                 frontSideEncoderAverage = 1;
             }
@@ -411,27 +365,27 @@ class MaximusPrimeBase {
             amountOfVeer = Math.min(((IMUReading - headingOffset) / 15), .4);
             if (amountOfVeer > 0) {
                 if (inToMove >= 0) {
-                    lfDrivetrainM.setPower(power);
-                    lbDrivetrainM.setPower(-power + amountOfVeer);
-                    rfDrivetrainM.setPower(power);
-                    rbDrivetrainM.setPower(-power + amountOfVeer);
+                    dcmDrivetrainLF.setPower(power);
+                    dcmDrivetrainLB.setPower(-power + amountOfVeer);
+                    dcmDrivetrainRF.setPower(power);
+                    dcmDrivetrainRB.setPower(-power + amountOfVeer);
                 } else if (inToMove < 0) {
-                    lfDrivetrainM.setPower(-power + amountOfVeer);
-                    lbDrivetrainM.setPower(power);
-                    rfDrivetrainM.setPower(-power + amountOfVeer);
-                    rbDrivetrainM.setPower(power);
+                    dcmDrivetrainLF.setPower(-power + amountOfVeer);
+                    dcmDrivetrainLB.setPower(power);
+                    dcmDrivetrainRF.setPower(-power + amountOfVeer);
+                    dcmDrivetrainRB.setPower(power);
                 }
             } else if (amountOfVeer <= 0){
                 if (inToMove >= 0) {
-                    lfDrivetrainM.setPower(power - amountOfVeer);
-                    lbDrivetrainM.setPower(-power);
-                    rfDrivetrainM.setPower(power);
-                    rbDrivetrainM.setPower(-power + amountOfVeer);
+                    dcmDrivetrainLF.setPower(power - amountOfVeer);
+                    dcmDrivetrainLB.setPower(-power);
+                    dcmDrivetrainRF.setPower(power);
+                    dcmDrivetrainRB.setPower(-power + amountOfVeer);
                 } else if (inToMove < 0) {
-                    lfDrivetrainM.setPower(-power + amountOfVeer);
-                    lbDrivetrainM.setPower(power);
-                    rfDrivetrainM.setPower(-power + amountOfVeer);
-                    rbDrivetrainM.setPower(power);
+                    dcmDrivetrainLF.setPower(-power + amountOfVeer);
+                    dcmDrivetrainLB.setPower(power);
+                    dcmDrivetrainRF.setPower(-power + amountOfVeer);
+                    dcmDrivetrainRB.setPower(power);
                 }
             }
         }
@@ -439,16 +393,16 @@ class MaximusPrimeBase {
         ResetEncoders();
     }
     void IMUTurn(float targetAngle, String leftOrRight,                                             // IMU Turn
-                 float minSpeed, float timeOut) {
+                 float minSpeed, float maxSpeedAngle, float timeOut) {
         // Reset the stall out timer
-        imuTimer.reset();
-        while (((LinearOpMode)opMode).opModeIsActive()&& imuTimer.seconds() < timeOut) {
+        tmrIMU.reset();
+        while (((LinearOpMode)opMode).opModeIsActive()&& tmrIMU.seconds() < timeOut) {
             // Update our current heading while turning
             angles = imu.getAngularOrientation
                     (AxesReference.INTRINSIC, AxesOrder.ZYX, AngleUnit.DEGREES);
             IMUReading = (angles.firstAngle);
             // Calculating the motor powers based on how far away we are form the target angle
-            float power = Math.max(Math.abs(IMUReading -targetAngle)/270, minSpeed);
+            float power = Math.max(Math.abs(IMUReading -targetAngle)/maxSpeedAngle, minSpeed);
             // If we are close enough to our target angle, break out of the while loop
             if (Math.abs(IMUReading) < Math.abs(targetAngle)) {
                 if ((Math.abs(IMUReading) - Math.abs(targetAngle)) > -2){
@@ -468,16 +422,15 @@ class MaximusPrimeBase {
         }
         // Stopping the motors once we completed our turn
         stopDrivetrain();
-    }public void RedOne() {                                                                          // Red One
+    }
+    public void RedOne() {                                                                          // Red One
         // Move backward to barcode
-        EncoderDrive(-14.5,25,.3,2,0);
-        // Move away from the barcode
-        EncoderDrive(2,25,.3,2,0);
+        EncoderDrive(-11,25,.3,2,0);
         // Strafe to the wall
         EncoderDriveSideways(18, 35,
                 .2, 2, 0);
         // Move forward to carousel
-        EncoderDrive(4,27,.3,2,0);
+        EncoderDrive(5.5,27,.3,2,0);
         // Deliver the duck
         CarouselAuto();
         // Move backward past Storage Unit
@@ -486,256 +439,293 @@ class MaximusPrimeBase {
         EncoderDriveSideways(-5, 12,
                 .2, 2, 0);
         // Turn towards Alliance Shipping Hub
-        IMUTurn(-90, "r",.1f, 3);
+        IMUTurn(-88, "r",.1f, 270, 3);
         // Move forward to Alliance Shipping Hub
-        EncoderDrive(-25.5, 37, .2, 2, -88);
+        EncoderDrive(-24.5, 37, .2, 2, -83);
         // Deliver the Pre-Loaded Box leaving the lift raised
         DeliverBlock();
         // Back up near the wall
         EncoderDrive(27.5, 37, .2, 2, -90);
         // Turn to be parallel with the wall
-        IMUTurn(1, "l",.2f, 3);
+        IMUTurn(1, "l",.2f, 270,3);
         // Strafe to the wall
-        EncoderDriveSideways(6, 11,
+        EncoderDriveSideways(8, 11,
                 .2, 2, 0);
         // Move forward into Storage Unit
-        EncoderDrive(13, 22, .2, 2,-2);
+        EncoderDrive(14, 22, .2, 2,1);
         // Lower the lift
-        liftM.setPower(-1);
-        while (liftM.getCurrentPosition() > 100) {
+        dcmLift.setPower(-1);
+        while (dcmLift.getCurrentPosition() > 100 && ((LinearOpMode)opMode).opModeIsActive()) {
         }
-        liftM.setPower(0);
+        dcmLift.setPower(0);
+        opMode.telemetry.addData("Heading: ", IMUReading);
+        opMode.telemetry.update();
     }
     public void BlueOne() {                                                                         // Blue One
         // Move backward to barcode
-        Sleep(2000);
-        EncoderDrive(-10,14,.3,2,0);
-        // Read the Shipping Element's position
-        // ColorSensorReadings();
-        // Move away from the barcode
-        // EncoderDrive(2,25,.3,2,0);
-        // Strafe to the wall
-        EncoderDriveSideways(-18, 35,
+        EncoderDrive(-11,25,.3,2,0);
+        IMUTurn(-88, "r",.1f, 270,3);
+        EncoderDrive(-22,25,.3,2,-88);
+        IMUTurn(2, "l",.1f, 270,3);
+        EncoderDriveSideways(-5, 20,
                 .2, 2, 0);
+        EncoderDrive(8, 10, .2, 2 , 0);
         // Move forward to carousel
-        EncoderDrive(1,27,.3,2,0);
         // Deliver the duck
         CarouselAuto();
         // Move backward past Storage Unit
-        EncoderDrive(-37, 41, .2, 2 , -2);
+        EncoderDrive(-38, 49, .2, 2 , -2);
         // Strafe away from the wall
-        EncoderDriveSideways(5, 10,
+        EncoderDriveSideways(5, 20,
                 .2, 2, 0);
         // Turn towards Alliance Shipping Hub
-        IMUTurn(90, "l",.2f, 3);
+        IMUTurn(90, "l",.1f, 270,3);
         // Move forward to Alliance Shipping Hub
-        EncoderDrive(-25, 37, .2, 2, 95);
+        EncoderDrive(-25.5, 37, .2, 2, 92);
         // Deliver the Pre-Loaded Box leaving the lift raised
         DeliverBlock();
         // Back up near the wall
-        EncoderDrive(28, 37, .2, 2, 90);
+        EncoderDrive(26.5, 37, .2, 2, 90);
         // Turn to be parallel with the wall
-        IMUTurn(-1, "r",.2f, 3);
+        IMUTurn(6, "r",.2f, 270,3);
         // Strafe to the wall
-        EncoderDriveSideways(-9, 11,
-                .2, 2, 0);
+        EncoderDriveSideways(-8, 25,
+                .2, 2, 3);
         // Move forward into Storage Unit
-        EncoderDrive(8, 22, .2, 2,5);
+        EncoderDrive(11, 22, .2, 2,3);
         // Lower the lift
-        liftM.setPower(-1);
-        while (liftM.getCurrentPosition() > 100) {
+        dcmLift.setPower(-1);
+        while (dcmLift.getCurrentPosition() > 100 && ((LinearOpMode)opMode).opModeIsActive()) {
         }
-        liftM.setPower(0);
+        dcmLift.setPower(0);
+        opMode.telemetry.addData("Heading: ", IMUReading);
+        opMode.telemetry.update();
     }
     public void RedTwo() {                                                                          // Red Two
         // Move backward to barcode
-        Sleep(2000);
-        EncoderDrive(-10, 20, .2, 2, 0);
+        EncoderDrive(-5, 20, .2, 2, 0);
         //  ColorSensorReadings();
         // Strafe to the front of the Alliance Shipping Hub
-        EncoderDriveSideways(10, 34, .2, 2, 0);
+        // EncoderDriveSideways(7, 34, .2, 2, 0);
+        IMUTurn(20, "l", .3f, 270,3);
         // Move backward to the Alliance Shipping Hub
-        EncoderDrive(-13, 16, .2, 2, 0);
+        EncoderDrive(-19, 16, .2, 2, 20);
         // Deliver the Pre-Loaded freight
         DeliverBlock();
         // Move away from the Alliance Shipping Hub
-        EncoderDrive(9, 15, .2,2,0);
+        EncoderDrive(15, 15, .2,2,20);
         // Lower the lift
-        liftM.setPower(-1);
-        while (liftM.getCurrentPosition() > 100) {
+        dcmLift.setPower(-1);
+        while (dcmLift.getCurrentPosition() > 100 && ((LinearOpMode)opMode).opModeIsActive()) {
         }
-        liftM.setPower(0);
+        dcmLift.setPower(0);
         // Turn parallel to the wall
-        IMUTurn(90, "l",.1f, 3);
+        IMUTurn(90, "l",.1f, 270,3);
         // Strafe into the wall
-        EncoderDriveSideways(8, 13, .2, 2, 90);
+        EncoderDriveSideways(6, 13, .2, 2, 90);
         // Move into the Warehouse
-        EncoderDrive(64, 48, .4, 4, 88);
-        Sleep(800);
-        collectionM.setPower(1);
-        EncoderDrive(-10, 90, .2, 3, 88);
-        collectionM.setPower(0);
-        // Strafe away from the wall
-       /* EncoderDriveSideways(-7, 19,
-                .2, 2, 90);
-        // Turn perpendicular to the wall to set up the field centric driver code
-        IMUTurn(-1, "r",.1f, 2);
-        // Move to barrier
-        EncoderDrive(-10, 28, .2, 2, 0);
-        // Strafe to the wall
-        EncoderDriveSideways(-15, 19, .2, 2, 0);
-*/
+        dcmCollection.setPower(1);
+        Sleep(200);
+        dcmCollection.setPower(-1);
+        Sleep(200);
+        dcmCollection.setPower(0);
+        EncoderDrive(47, 48, .4, 4, 88);
+        dcmCollection.setPower(-1);
+        EncoderDrive(-10, 92, .2, 3, 88);
+        if (bCollectedBlock) {
+            dcmCollection.setPower(-1);
+            Sleep(500);
+            EncoderDrive(-53, 55, .2, 3, 92);
+            dcmCollection.setPower(0);
+            EncoderDriveSideways(-5, 15, .2, 2, 90);
+            IMUTurn(1, "r", .1f, 270, 3);
+            EncoderDrive(-13, 26, .2, 2, 0);
+            if (autonomousTargetLevel == AutonomousTargetLevel.LOW) {
+                autonomousTargetLevel = AutonomousTargetLevel.MIDDLE;
+            } else {
+                autonomousTargetLevel = AutonomousTargetLevel.LOW;
+            }
+            DeliverBlock();
+            EncoderDrive(10, 15, .2, 2, 0);
+            IMUTurn(90, "l", .1f, 270, 3);
+            EncoderDriveSideways(8, 18, .2, 2, 88);
+            EncoderDrive(69, 40, .2, 2, 88);
+        } else {
+            dcmCollection.setPower(0);
+            EncoderDrive(15, 40, .2, 2, 86);
+            // Strafe away from the wall
+            opMode.telemetry.addData("Heading: ", IMUReading);
+            opMode.telemetry.update();
+        }
     }
     public void BlueTwo() {                                                                         // Blue Two
         // Move backward to barcode
-        EncoderDrive(-16, 25, .2, 2, 0);
-        // Move away from the barcode
-        EncoderDrive(2, 25, .2, 2, 0);
+        EncoderDrive(-5, 10, .2, 2, 0);
+        //  ColorSensorReadings();
         // Strafe to the front of the Alliance Shipping Hub
-        EncoderDriveSideways(-12, 34,
-                .2, 2, 0);
+        // EncoderDriveSideways(7, 34, .2, 2, 0);
+        IMUTurn(-80, "r", .3f, 120,3);
         // Move backward to the Alliance Shipping Hub
-        EncoderDrive(-10, 12, .2, 2, 0);
+        EncoderDrive(-28, 29, .2, 2, -87);
+        IMUTurn(-7, "l", .3f, 120,3);
+        EncoderDrive(-19.5, 18, .2, 2, 0);
         // Deliver the Pre-Loaded freight
         DeliverBlock();
         // Move away from the Alliance Shipping Hub
-        EncoderDrive(8, 15, .2,2,0);
+        EncoderDrive(17, 16, .2,2,0);
         // Lower the lift
-        liftM.setPower(-1);
-        while (liftM.getCurrentPosition() > 100) {
+        dcmLift.setPower(-1);
+        while (dcmLift.getCurrentPosition() > 100 && ((LinearOpMode)opMode).opModeIsActive()) {
         }
-        liftM.setPower(0);
+        dcmLift.setPower(0);
         // Turn parallel to the wall
-        IMUTurn(-90, "r",.1f, 3);
+        IMUTurn(-85, "r",.1f, 120,3);
         // Strafe into the wall
-        EncoderDriveSideways(-11, 13,
-                .2, 2, -90);
+        EncoderDriveSideways(-5, 6, .2, 2, -88);
         // Move into the Warehouse
-        EncoderDrive(52, 48, .4, 4, -86);
-        // Strafe away from the wall
-        EncoderDriveSideways(7, 19,
-                .2, 2, -90);
-        // Turn perpendicular to the wall to set up the field centric driver code
-        IMUTurn(-1, "l",.1f, 2);
-        // Move out of the way if our alliance partners want to park in the warehouse
-        EncoderDrive(-10, 28, .2, 2, 0);
-        EncoderDriveSideways(15, 19,
-                .2, 2, 0);
+        dcmCollection.setPower(1);
+        Sleep(200);
+        dcmCollection.setPower(-1);
+        Sleep(200);
+        dcmCollection.setPower(0);
+        EncoderDrive(60, 40, .4, 4, -87);
+        dcmCollection.setPower(-1);
+        EncoderDrive(-10, 92, .2, 3, -92);
+        dcmCollection.setPower(-1);
+        Sleep(500);
+        if (bCollectedBlock) {
+            EncoderDrive(-52, 40, .2, 3, -92);
+            dcmCollection.setPower(0);
+            EncoderDriveSideways(5, 15, .2, 2, -90);
+            IMUTurn(-2, "l", .1f, 120, 3);
+            EncoderDrive(-13, 26, .2, 2, 0);
+            if (autonomousTargetLevel == AutonomousTargetLevel.LOW) {
+                autonomousTargetLevel = AutonomousTargetLevel.MIDDLE;
+            } else {
+                autonomousTargetLevel = AutonomousTargetLevel.LOW;
+            }
+            DeliverBlock();
+            EncoderDrive(10, 10, .2, 2, 0);
+            IMUTurn(-85, "r", .1f, 120, 3);
+            EncoderDriveSideways(-15, 25, .2, 2, -86);
+            EncoderDrive(60, 40, .2, 2, -86);
+        } else {
+            dcmCollection.setPower(0);
+            EncoderDrive(15, 40, .2, 2, -86);
+            // Strafe away from the wall
+            opMode.telemetry.addData("Heading: ", IMUReading);
+            opMode.telemetry.update();
+        }
     }
     public void CarouselAuto() {                                                                    // Carousel Auto
         // If we are red
-        if (alliance == Alliance.BLUE1 || alliance == Alliance.BLUE2) {
-            // Slowly move into the carousel
-            lfDrivetrainM.setPower(.1);
-            lfDrivetrainM.setPower(.1);
+        if (alliance == Alliance.RED1 || alliance == Alliance.RED2) {
             // Turn on the carousel spinner for 4.5 seconds
-            lSpinnerM.setPower(-.35);
-            rSpinnerM.setPower(-.35);
-            Sleep(4500);
+            dcmSpinnerR.setPower(-.3);
+            Sleep(5000);
             // Stop the motors
-            lSpinnerM.setPower(0);
-            rSpinnerM.setPower(0);
-            lfDrivetrainM.setPower(0);
-            lbDrivetrainM.setPower(0);
+            dcmSpinnerR.setPower(0);
         }
         // If we are blue
-        else if (alliance == Alliance.RED1 || alliance == Alliance.RED2) {
+        else if (alliance == Alliance.BLUE1 || alliance == Alliance.BLUE2) {
             // Turn on the carousel spinner for 4.5 seconds
-            lSpinnerM.setPower(.35);
-            rSpinnerM.setPower(.35);
-            Sleep(4500);
+            dcmSpinnerR.setPower(.3);
+            Sleep(5000);
             // Stop the motors
-            lSpinnerM.setPower(0);
-            rSpinnerM.setPower(0);
-            rfDrivetrainM.setPower(0);
+            dcmSpinnerR.setPower(0);
         }
     }
     public void DeliverBlock() {                                                                    // Deliver Block
         // Reset the lift's home position
-        liftM.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-        liftM.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        dcmLift.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        dcmLift.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
         // If we should deliver into the high goal
         if (autonomousTargetLevel == AutonomousTargetLevel.HIGH) {
             // Raise the lift.
-            liftM.setPower(1);
-            while (liftM.getCurrentPosition() < 2150) {
+            dcmLift.setPower(1);
+            while (dcmLift.getCurrentPosition() < 2150 && ((LinearOpMode)opMode).opModeIsActive()) {
             }
-            liftM.setPower(0);
+            dcmLift.setPower(0);
             // Deliver block
-            deliveryS.setPower(1);
-            Sleep(2000);
-            deliveryS.setPower(0);
+            crsDelivery.setPower(1);
+            Sleep(2250);
+            crsDelivery.setPower(0);
             // Stop the lift
-            liftM.setPower(0);
+            dcmLift.setPower(0);
         }
         // If we should deliver into the high goal
         else if (autonomousTargetLevel == AutonomousTargetLevel.MIDDLE) {
             // Raise the lift
-            liftM.setPower(1);
-            while (liftM.getCurrentPosition() < 1200) {
+            dcmLift.setPower(1);
+            while (dcmLift.getCurrentPosition() < 1200 && ((LinearOpMode)opMode).opModeIsActive()) {
             }
-            liftM.setPower(0);
+            dcmLift.setPower(0);
             // Deliver block
-            deliveryS.setPower(1);
-            Sleep(2000);
+            crsDelivery.setPower(1);
+            Sleep(2250);
+            crsDelivery.setPower(0);
             // Stop the lift
-            liftM.setPower(0);
+            dcmLift.setPower(0);
         }
         // If we should deliver into the high goal
         else if (autonomousTargetLevel == AutonomousTargetLevel.LOW) {
             // Raise the lift
-            liftM.setPower(1);
-            while (liftM.getCurrentPosition() < 500) {
+            dcmLift.setPower(1);
+            while (dcmLift.getCurrentPosition() < 500 && ((LinearOpMode)opMode).opModeIsActive()) {
             }
-            liftM.setPower(0);
+            dcmLift.setPower(0);
             // Deliver block
-            deliveryS.setPower(1);
-            Sleep(2000);
-            deliveryS.setPower(0);
+            crsDelivery.setPower(1);
+            Sleep(2250);
+            crsDelivery.setPower(0);
             // Stop the lift
-            liftM.setPower(0);
+            dcmLift.setPower(0);
         }
     }
     public void Configuration() {                                                                   // Configuration
-        collectionM = opMode.hardwareMap.dcMotor.get("collectionM");
-        liftM = opMode.hardwareMap.dcMotor.get("liftM");
-        lSpinnerM = opMode.hardwareMap.dcMotor.get("lSpinnerM");
-        rSpinnerM = opMode.hardwareMap.dcMotor.get("rSpinnerM");
-        lfDrivetrainM = opMode.hardwareMap.dcMotor.get("lfDrvtrnM");
-        rfDrivetrainM = opMode.hardwareMap.dcMotor.get("rfDrvtrnM");
-        lbDrivetrainM = opMode.hardwareMap.dcMotor.get("lbDrvtrnM");
-        rbDrivetrainM = opMode.hardwareMap.dcMotor.get("rbDrvtrnM");
-        this.deliveryS = opMode.hardwareMap.get(CRServo.class, "deliveryS");
-        collectionColorSensor = opMode.hardwareMap.
+        dcmCollection = opMode.hardwareMap.dcMotor.get("collectionM");
+        dcmLift = opMode.hardwareMap.dcMotor.get("liftM");
+        dcmSpinnerR = opMode.hardwareMap.dcMotor.get("rSpinnerM");
+        dcmDrivetrainLF = opMode.hardwareMap.dcMotor.get("lfDrvtrnM");
+        dcmDrivetrainRF = opMode.hardwareMap.dcMotor.get("rfDrvtrnM");
+        dcmDrivetrainLB = opMode.hardwareMap.dcMotor.get("lbDrvtrnM");
+        dcmDrivetrainRB = opMode.hardwareMap.dcMotor.get("rbDrvtrnM");
+        dcmCapping = opMode.hardwareMap.dcMotor.get("dcmCapping");
+        this.crsDelivery = opMode.hardwareMap.get(CRServo.class, "deliveryS");
+        csCollection = opMode.hardwareMap.
                 get(NormalizedColorSensor.class, "collectionColorSensor");
 
-        liftM.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-        lfDrivetrainM.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-        rfDrivetrainM.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-        lbDrivetrainM.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-        rbDrivetrainM.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-        collectionM.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
-        liftM.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
-        lSpinnerM.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
-        rSpinnerM.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
-        lfDrivetrainM.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
-        rfDrivetrainM.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
-        lbDrivetrainM.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
-        rbDrivetrainM.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        dcmLift.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        dcmDrivetrainLF.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        dcmDrivetrainRF.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        dcmDrivetrainLB.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        dcmDrivetrainRB.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        dcmCollection.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        dcmCapping.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        dcmLift.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        dcmSpinnerR.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        dcmDrivetrainLF.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        dcmDrivetrainRF.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        dcmDrivetrainLB.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        dcmDrivetrainRB.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         BNO055IMU.Parameters parameters = new BNO055IMU.Parameters();
         parameters.angleUnit           = BNO055IMU.AngleUnit.DEGREES;
         imu = opMode.hardwareMap.get(BNO055IMU.class, "imu");
         imu.initialize(parameters);
+        dcmCapping.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        dcmCapping.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
     }
     public void UpdateColorSensor() {
-        collectionDistanceSensorReading = ((DistanceSensor) collectionColorSensor).getDistance(DistanceUnit.INCH);
+        collectionDistanceSensorReading = ((DistanceSensor) csCollection).getDistance(DistanceUnit.INCH);
     }
     public void Telemetry() {                                                                       // Telemetry
         opMode.telemetry.addData("Drivetrain speed: ", drvTrnSpd);
-        opMode.telemetry.addData("Teleop timer: ", teleopTimer);
-        opMode.telemetry.addData("Carousel timer: ", carouselTeleTimer);
+        opMode.telemetry.addData("Teleop timer: ", tmrTeleop);
+        opMode.telemetry.addData("Carousel timer: ", tmrCarouselTele);
         opMode.telemetry.addData("Carousel timer adj: ", carouselTimerOffset);
-        opMode.telemetry.addData("Carousel power: ", lSpinnerM.getPower());
+        opMode.telemetry.addData("Lift: ", dcmLift.getCurrentPosition());
+        UpdateColorSensor();
+        opMode.telemetry.addData("Collection: ", collectionDistanceSensorReading);
         opMode.telemetry.update();
     }
     public void AllianceDetermination() {                                                           // Alliance determination
@@ -756,14 +746,14 @@ class MaximusPrimeBase {
     }
     public void ResetEncoders() {
         // Function to reset encoders
-        lfDrivetrainM.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-        rfDrivetrainM.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-        lbDrivetrainM.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-        rbDrivetrainM.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-        lfDrivetrainM.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-        rfDrivetrainM.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-        lbDrivetrainM.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-        rbDrivetrainM.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        dcmDrivetrainLF.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        dcmDrivetrainRF.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        dcmDrivetrainLB.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        dcmDrivetrainRB.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        dcmDrivetrainLF.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        dcmDrivetrainRF.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        dcmDrivetrainLB.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        dcmDrivetrainRB.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
     }
     public void Autonomous() {
         // Play the autonomous based on what path was chosen
@@ -786,16 +776,16 @@ class MaximusPrimeBase {
         }
     }
     public void setDrivePowerSides(double motorPowerL, double motorPowerR) {
-        lfDrivetrainM.setPower(motorPowerL);
-        lbDrivetrainM.setPower(motorPowerL);
-        rfDrivetrainM.setPower(motorPowerR);
-        rbDrivetrainM.setPower(motorPowerR);
+        dcmDrivetrainLF.setPower(motorPowerL);
+        dcmDrivetrainLB.setPower(motorPowerL);
+        dcmDrivetrainRF.setPower(motorPowerR);
+        dcmDrivetrainRB.setPower(motorPowerR);
     }
     public void stopDrivetrain() {
-        lfDrivetrainM.setPower(0);
-        lbDrivetrainM.setPower(0);
-        rfDrivetrainM.setPower(0);
-        rbDrivetrainM.setPower(0);
+        dcmDrivetrainLF.setPower(0);
+        dcmDrivetrainLB.setPower(0);
+        dcmDrivetrainRF.setPower(0);
+        dcmDrivetrainRB.setPower(0);
     }
     public void ResetHeading(){ // Resets the imu heading by adding/subtracting from itself
         if (opMode.gamepad1.b){ // In case something goes wrong, driver can reposition the robot and reset the heading during teleop

@@ -1,5 +1,6 @@
 package org.firstinspires.ftc.teamcode;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
@@ -14,9 +15,9 @@ import org.openftc.easyopencv.OpenCvCamera;
 import org.openftc.easyopencv.OpenCvCameraFactory;
 import org.openftc.easyopencv.OpenCvCameraRotation;
 import org.openftc.easyopencv.OpenCvPipeline;
+
 @Autonomous(name="MaximusPrimeAuto", group="OpMode")
-public class MaximusPrimeAuto extends LinearOpMode
-{
+public class MaximusPrimeAuto extends LinearOpMode {
     MaximusPrimeBase base;
     OpenCvCamera webcam;
     SkystoneDeterminationPipeline pipeline;
@@ -42,6 +43,7 @@ public class MaximusPrimeAuto extends LinearOpMode
         }
         waitForStart();
         base.RetrieveShippingElementPosition();
+        base.Autonomous();
         while (opModeIsActive()) {
         }
     }
@@ -114,10 +116,10 @@ public class MaximusPrimeAuto extends LinearOpMode
                     region2_pointB, // Second point which defines the rectangle
                     BLUE , // The color the rectangle is drawn in
                     2); // Thickness of the rectangle lines
-            if (avg1>150) {
+            if (avg1>140) {
                 greenSquareActivated = true;
                 blueSquareActivated = false;
-            } else if (avg2>150) {
+            } else if (avg2>140) {
                 blueSquareActivated = true;
                 greenSquareActivated = false;
             } else {
