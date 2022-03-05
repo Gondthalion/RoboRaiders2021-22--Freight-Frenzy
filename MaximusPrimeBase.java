@@ -6,8 +6,10 @@ import com.qualcomm.robotcore.hardware.CRServo;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DistanceSensor;
 import com.qualcomm.robotcore.hardware.NormalizedColorSensor;
+import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
+import org.checkerframework.checker.units.qual.A;
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.AxesOrder;
 import org.firstinspires.ftc.robotcore.external.navigation.AxesReference;
@@ -21,6 +23,7 @@ class MaximusPrimeBase {
             dcmDrivetrainLF, dcmDrivetrainRF, dcmDrivetrainLB, dcmDrivetrainRB, dcmCapping;
     // Servo declaration
     CRServo crsDelivery;
+    Servo crsCapping;
     // IMU setup
     BNO055IMU imu;
     Orientation angles;
@@ -53,6 +56,7 @@ class MaximusPrimeBase {
     int iDeliveringTSETicks = 1200;
     int iTargetTicks = iRestingTicks;
 
+    double crsCappingPosOffset = 0;
     double carouselTimerOffset = 0;
     boolean autoTurnEnabled = false;
     // Variables used in determining drivetrain speed
@@ -88,6 +92,19 @@ class MaximusPrimeBase {
     }
     /*Teleop Functions*/
     public void OperatorControls() {                                                                // Operator Controls
+        if (alliance == Alliance.BLUE1 || alliance == Alliance.BLUE2) {
+            dcmCapping.setPower(opMode.gamepad2.left_trigger + opMode.gamepad2.right_trigger);
+        } else {
+            dcmCapping.setPower(-opMode.gamepad2.left_trigger - opMode.gamepad2.right_trigger);
+        }
+        if (opMode.gamepad2.left_bumper) {
+            crsCapping.setPosition(0 - crsCappingPosOffset);
+        } else if (opMode.gamepad2.right_bumper) {
+            crsCapping.setPosition(1 - crsCappingPosOffset);
+        }
+        if (opMode.gamepad2.dpad_left) {
+            crsCappingPosOffset = crsCapping.getPosition();
+        }
         // Turn off the automatic the lift if the joystick is used
         // Lift controls.
         dcmLift.setPower(-opMode.gamepad2.left_stick_y);
@@ -692,6 +709,7 @@ class MaximusPrimeBase {
         dcmDrivetrainRB = opMode.hardwareMap.dcMotor.get("rbDrvtrnM");
         dcmCapping = opMode.hardwareMap.dcMotor.get("dcmCapping");
         this.crsDelivery = opMode.hardwareMap.get(CRServo.class, "deliveryS");
+        this.crsCapping = opMode.hardwareMap.get(Servo.class, "cappingS");
         csCollection = opMode.hardwareMap.
                 get(NormalizedColorSensor.class, "collectionColorSensor");
 
@@ -712,8 +730,6 @@ class MaximusPrimeBase {
         parameters.angleUnit           = BNO055IMU.AngleUnit.DEGREES;
         imu = opMode.hardwareMap.get(BNO055IMU.class, "imu");
         imu.initialize(parameters);
-        dcmCapping.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-        dcmCapping.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
     }
     public void UpdateColorSensor() {
         collectionDistanceSensorReading = ((DistanceSensor) csCollection).getDistance(DistanceUnit.INCH);
