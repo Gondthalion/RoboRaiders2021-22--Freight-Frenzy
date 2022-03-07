@@ -105,7 +105,6 @@ class MaximusPrimeBase {
         if (opMode.gamepad2.dpad_left) {
             crsCappingPosOffset = crsCapping.getPosition();
         }
-        // Turn off the automatic the lift if the joystick is used
         // Lift controls.
         dcmLift.setPower(-opMode.gamepad2.left_stick_y);
         // Collection controls.
