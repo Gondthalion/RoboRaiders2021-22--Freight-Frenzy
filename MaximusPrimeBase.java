@@ -632,7 +632,6 @@ class MaximusPrimeBase {
             // Strafe away from the wall
             opMode.telemetry.addData("Heading: ", IMUReading);
             opMode.telemetry.update();
-
         }
     }
     public void CarouselAuto() {                                                                    // Carousel Auto
