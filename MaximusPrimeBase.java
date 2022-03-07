@@ -105,6 +105,7 @@ class MaximusPrimeBase {
         if (opMode.gamepad2.dpad_left) {
             crsCappingPosOffset = crsCapping.getPosition();
         }
+        
         // Lift controls.
         dcmLift.setPower(-opMode.gamepad2.left_stick_y);
         // Collection controls.
