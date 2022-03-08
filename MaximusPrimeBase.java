@@ -10,7 +10,6 @@ import com.qualcomm.robotcore.hardware.NormalizedColorSensor;
 import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
-import org.checkerframework.checker.units.qual.A;
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.AxesOrder;
 import org.firstinspires.ftc.robotcore.external.navigation.AxesReference;
@@ -43,20 +42,7 @@ class MaximusPrimeBase {
     }
     float IMUReading = 0;
     /*                TELEOP VARIABLES               */
-    TingleBombs tingleBombs = TingleBombs.UP_FREIGHT;
-    private enum TingleBombs{
-        UP_FREIGHT,
-        UP_TSE,
-        DELIVERING_FREIGHT,
-        DELIVERING_TSE
-    }
     boolean bCollectedBlock = false;
-    int iRestingTicks = 100;
-    int iPickingFreightTicks = 300;
-    int iPickingTSETicks = 400;
-    int iDeliveringFreightTicks = 900;
-    int iDeliveringTSETicks = 1200;
-    int iTargetTicks = iRestingTicks;
     double crsCappingPosOffset = 0;
 
     double carouselTimerOffset = 0;
@@ -184,17 +170,6 @@ class MaximusPrimeBase {
         if (downFlag && !downPersistent) {
             if (drvTrnSpd > .1){drvTrnSpd -= .1;}
             downPersistent = true;
-        }
-    }
-    public void AutoCapping() {
-        if (opMode.gamepad2.dpad_down) {
-            iTargetTicks = iPickingFreightTicks;
-        }
-
-        if (opMode.gamepad2.dpad_down || opMode.gamepad2.dpad_left || opMode.gamepad2.dpad_up || opMode.gamepad2.dpad_right) {
-            switch (tingleBombs) {
-                case UP_FREIGHT:
-            }
         }
     }
     void TeleIMUTurn() {                                                                            // Teleop IMU turn
@@ -430,10 +405,10 @@ class MaximusPrimeBase {
         ResetEncoders();
     }
     void IMUTurn(float targetAngle, String leftOrRight,                                             // IMU Turn
-                 float minSpeed, float maxSpeedAngle, float timeOut) {
+                 float minSpeed, float maxSpeedAngle) {
         // Reset the stall out timer
         tmrIMU.reset();
-        while (((LinearOpMode)opMode).opModeIsActive()&& tmrIMU.seconds() < timeOut) {
+        while (((LinearOpMode)opMode).opModeIsActive()&& tmrIMU.seconds() < 3) {
             // Update our current heading while turning
             angles = imu.getAngularOrientation
                     (AxesReference.INTRINSIC, AxesOrder.ZYX, AngleUnit.DEGREES);
@@ -476,7 +451,7 @@ class MaximusPrimeBase {
         EncoderDriveSideways(-5, 12,
                 .2, 2, 0);
         // Turn towards Alliance Shipping Hub
-        IMUTurn(-88, "r",.1f, 270, 3);
+        IMUTurn(-88, "r",.1f, 270);
         // Move forward to Alliance Shipping Hub
         EncoderDrive(-24.5, 37, .2, 2, -83);
         // Deliver the Pre-Loaded Box leaving the lift raised
@@ -484,7 +459,7 @@ class MaximusPrimeBase {
         // Back up near the wall
         EncoderDrive(27.5, 37, .2, 2, -90);
         // Turn to be parallel with the wall
-        IMUTurn(1, "l",.2f, 270,3);
+        IMUTurn(1, "l",.2f, 270);
         // Strafe to the wall
         EncoderDriveSideways(8, 11,
                 .2, 2, 0);
@@ -493,6 +468,7 @@ class MaximusPrimeBase {
         // Lower the lift
         dcmLift.setPower(-1);
         while (dcmLift.getCurrentPosition() > 100 && ((LinearOpMode)opMode).opModeIsActive()) {
+            tmrGeneric.seconds();
         }
         dcmLift.setPower(0);
         opMode.telemetry.addData("Heading: ", IMUReading);
@@ -501,9 +477,9 @@ class MaximusPrimeBase {
     public void BlueOne() {                                                                         // Blue One
         // Move backward to barcode
         EncoderDrive(-11,25,.3,2,0);
-        IMUTurn(-88, "r",.1f, 270,3);
+        IMUTurn(-88, "r",.1f, 270);
         EncoderDrive(-22,25,.3,2,-88);
-        IMUTurn(2, "l",.1f, 270,3);
+        IMUTurn(2, "l",.1f, 270);
         EncoderDriveSideways(-5, 20,
                 .2, 2, 0);
         EncoderDrive(8, 10, .2, 2 , 0);
@@ -516,7 +492,7 @@ class MaximusPrimeBase {
         EncoderDriveSideways(5, 20,
                 .2, 2, 0);
         // Turn towards Alliance Shipping Hub
-        IMUTurn(90, "l",.1f, 270,3);
+        IMUTurn(90, "l",.1f, 270);
         // Move forward to Alliance Shipping Hub
         EncoderDrive(-25.5, 37, .2, 2, 92);
         // Deliver the Pre-Loaded Box leaving the lift raised
@@ -524,7 +500,7 @@ class MaximusPrimeBase {
         // Back up near the wall
         EncoderDrive(26.5, 37, .2, 2, 90);
         // Turn to be parallel with the wall
-        IMUTurn(6, "r",.2f, 270,3);
+        IMUTurn(6, "r",.2f, 270);
         // Strafe to the wall
         EncoderDriveSideways(-8, 25,
                 .2, 2, 3);
@@ -533,6 +509,7 @@ class MaximusPrimeBase {
         // Lower the lift
         dcmLift.setPower(-1);
         while (dcmLift.getCurrentPosition() > 100 && ((LinearOpMode)opMode).opModeIsActive()) {
+            tmrGeneric.seconds();
         }
         dcmLift.setPower(0);
         opMode.telemetry.addData("Heading: ", IMUReading);
@@ -544,7 +521,7 @@ class MaximusPrimeBase {
         //  ColorSensorReadings();
         // Strafe to the front of the Alliance Shipping Hub
         // EncoderDriveSideways(7, 34, .2, 2, 0);
-        IMUTurn(20, "l", .3f, 270,3);
+        IMUTurn(20, "l", .3f, 270);
         // Move backward to the Alliance Shipping Hub
         EncoderDrive(-19, 16, .2, 2, 20);
         // Deliver the Pre-Loaded freight
@@ -554,10 +531,11 @@ class MaximusPrimeBase {
         // Lower the lift
         dcmLift.setPower(-1);
         while (dcmLift.getCurrentPosition() > 100 && ((LinearOpMode)opMode).opModeIsActive()) {
+            tmrGeneric.seconds();
         }
         dcmLift.setPower(0);
         // Turn parallel to the wall
-        IMUTurn(90, "l",.1f, 270,3);
+        IMUTurn(90, "l",.1f, 270);
         // Strafe into the wall
         EncoderDriveSideways(6, 13, .2, 2, 90);
         // Move into the Warehouse
@@ -575,7 +553,7 @@ class MaximusPrimeBase {
             EncoderDrive(-53, 55, .2, 3, 92);
             dcmCollection.setPower(0);
             EncoderDriveSideways(-5, 15, .2, 2, 90);
-            IMUTurn(1, "r", .1f, 270, 3);
+            IMUTurn(1, "r", .1f, 270);
             EncoderDrive(-13, 26, .2, 2, 0);
             if (autonomousTargetLevel == AutonomousTargetLevel.LOW) {
                 autonomousTargetLevel = AutonomousTargetLevel.MIDDLE;
@@ -584,7 +562,7 @@ class MaximusPrimeBase {
             }
             DeliverBlock();
             EncoderDrive(10, 15, .2, 2, 0);
-            IMUTurn(90, "l", .1f, 270, 3);
+            IMUTurn(90, "l", .1f, 270);
             EncoderDriveSideways(8, 18, .2, 2, 88);
             EncoderDrive(69, 40, .2, 2, 88);
         } else {
@@ -601,10 +579,10 @@ class MaximusPrimeBase {
         //  ColorSensorReadings();
         // Strafe to the front of the Alliance Shipping Hub
         // EncoderDriveSideways(7, 34, .2, 2, 0);
-        IMUTurn(-80, "r", .3f, 120,3);
+        IMUTurn(-80, "r", .3f, 120);
         // Move backward to the Alliance Shipping Hub
         EncoderDrive(-28, 29, .2, 2, -87);
-        IMUTurn(-7, "l", .3f, 120,3);
+        IMUTurn(-7, "l", .3f, 120);
         EncoderDrive(-19.5, 18, .2, 2, 0);
         // Deliver the Pre-Loaded freight
         DeliverBlock();
@@ -613,10 +591,11 @@ class MaximusPrimeBase {
         // Lower the lift
         dcmLift.setPower(-1);
         while (dcmLift.getCurrentPosition() > 100 && ((LinearOpMode)opMode).opModeIsActive()) {
+            tmrGeneric.seconds();
         }
         dcmLift.setPower(0);
         // Turn parallel to the wall
-        IMUTurn(-85, "r",.1f, 120,3);
+        IMUTurn(-85, "r",.1f, 120);
         // Strafe into the wall
         EncoderDriveSideways(-5, 6, .2, 2, -88);
         // Move into the Warehouse
@@ -634,7 +613,7 @@ class MaximusPrimeBase {
             EncoderDrive(-52, 40, .2, 3, -92);
             dcmCollection.setPower(0);
             EncoderDriveSideways(5, 15, .2, 2, -90);
-            IMUTurn(-2, "l", .1f, 120, 3);
+            IMUTurn(-2, "l", .1f, 120);
             EncoderDrive(-13, 26, .2, 2, 0);
             if (autonomousTargetLevel == AutonomousTargetLevel.LOW) {
                 autonomousTargetLevel = AutonomousTargetLevel.MIDDLE;
@@ -643,7 +622,7 @@ class MaximusPrimeBase {
             }
             DeliverBlock();
             EncoderDrive(10, 10, .2, 2, 0);
-            IMUTurn(-85, "r", .1f, 120, 3);
+            IMUTurn(-85, "r", .1f, 120);
             EncoderDriveSideways(-15, 25, .2, 2, -86);
             EncoderDrive(60, 40, .2, 2, -86);
         } else {
@@ -681,6 +660,7 @@ class MaximusPrimeBase {
             // Raise the lift.
             dcmLift.setPower(1);
             while (dcmLift.getCurrentPosition() < 2150 && ((LinearOpMode)opMode).opModeIsActive()) {
+                tmrGeneric.seconds();
             }
             dcmLift.setPower(0);
             // Deliver block
@@ -695,6 +675,7 @@ class MaximusPrimeBase {
             // Raise the lift
             dcmLift.setPower(1);
             while (dcmLift.getCurrentPosition() < 1200 && ((LinearOpMode)opMode).opModeIsActive()) {
+                tmrGeneric.seconds();
             }
             dcmLift.setPower(0);
             // Deliver block
@@ -709,6 +690,7 @@ class MaximusPrimeBase {
             // Raise the lift
             dcmLift.setPower(1);
             while (dcmLift.getCurrentPosition() < 500 && ((LinearOpMode)opMode).opModeIsActive()) {
+                tmrGeneric.seconds();
             }
             dcmLift.setPower(0);
             // Deliver block
