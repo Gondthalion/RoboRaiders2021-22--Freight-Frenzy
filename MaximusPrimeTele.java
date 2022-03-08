@@ -24,6 +24,7 @@ public class MaximusPrimeTele extends OpMode {
         base.UpdateDriveTrain();
         base.Telemetry();
         base.ResetHeading();
+        base.Lights();
     }
     @Override
     public void stop() {

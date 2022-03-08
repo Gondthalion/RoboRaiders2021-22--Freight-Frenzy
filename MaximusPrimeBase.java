@@ -1,5 +1,6 @@
 package org.firstinspires.ftc.teamcode;
 import com.qualcomm.hardware.bosch.BNO055IMU;
+import com.qualcomm.hardware.rev.RevBlinkinLedDriver;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import com.qualcomm.robotcore.hardware.CRServo;
@@ -24,6 +25,7 @@ class MaximusPrimeBase {
     // Servo declaration
     CRServo crsDelivery;
     Servo crsCapping;
+    RevBlinkinLedDriver daLights;
     // IMU setup
     BNO055IMU imu;
     Orientation angles;
@@ -55,8 +57,8 @@ class MaximusPrimeBase {
     int iDeliveringFreightTicks = 900;
     int iDeliveringTSETicks = 1200;
     int iTargetTicks = iRestingTicks;
-
     double crsCappingPosOffset = 0;
+
     double carouselTimerOffset = 0;
     boolean autoTurnEnabled = false;
     // Variables used in determining drivetrain speed
@@ -92,11 +94,9 @@ class MaximusPrimeBase {
     }
     /*Teleop Functions*/
     public void OperatorControls() {                                                                // Operator Controls
-        if (alliance == Alliance.BLUE1 || alliance == Alliance.BLUE2) {
-            dcmCapping.setPower(opMode.gamepad2.left_trigger + opMode.gamepad2.right_trigger);
-        } else {
-            dcmCapping.setPower(-opMode.gamepad2.left_trigger - opMode.gamepad2.right_trigger);
-        }
+        dcmCapping.setPower(opMode.gamepad2.left_trigger * .8);
+        dcmCapping.setPower(-opMode.gamepad2.right_trigger * .4);
+
         if (opMode.gamepad2.left_bumper) {
             crsCapping.setPosition(0 - crsCappingPosOffset);
         } else if (opMode.gamepad2.right_bumper) {
@@ -105,7 +105,6 @@ class MaximusPrimeBase {
         if (opMode.gamepad2.dpad_left) {
             crsCappingPosOffset = crsCapping.getPosition();
         }
-        
         // Lift controls.
         dcmLift.setPower(-opMode.gamepad2.left_stick_y);
         // Collection controls.
@@ -117,6 +116,27 @@ class MaximusPrimeBase {
             crsDelivery.setPower(-1);
         } else {
             crsDelivery.setPower(0);
+        }
+    }
+    public void Lights() {
+        UpdateColorSensor();
+        if (collectionDistanceSensorReading < 1.35) {
+            tmrGeneric.reset();
+            bCollectedBlock = true;
+        } else if (tmrGeneric.seconds() > 1) {
+            bCollectedBlock = false;
+        }
+        if (bCollectedBlock) {
+            daLights.setPattern(RevBlinkinLedDriver.BlinkinPattern.BLUE);
+        } else if (tmrTeleop.seconds() > 85 && tmrTeleop.seconds() < 90) {
+            daLights.setPattern(RevBlinkinLedDriver.BlinkinPattern.HEARTBEAT_RED);
+        } else {
+            daLights.setPattern(RevBlinkinLedDriver.BlinkinPattern.RED);
+        }
+        if (opMode.gamepad2.dpad_left) {
+            daLights.setPattern(RevBlinkinLedDriver.BlinkinPattern.DARK_RED);
+        } else if (opMode.gamepad2.dpad_right) {
+            daLights.setPattern(RevBlinkinLedDriver.BlinkinPattern.BLUE);
         }
     }
     public void CarouselTele() {
@@ -712,7 +732,7 @@ class MaximusPrimeBase {
         this.crsCapping = opMode.hardwareMap.get(Servo.class, "cappingS");
         csCollection = opMode.hardwareMap.
                 get(NormalizedColorSensor.class, "collectionColorSensor");
-
+        daLights = opMode.hardwareMap.get(RevBlinkinLedDriver.class, "lights");
         dcmLift.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
         dcmDrivetrainLF.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
         dcmDrivetrainRF.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
