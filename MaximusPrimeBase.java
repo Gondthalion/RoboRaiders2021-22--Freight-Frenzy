@@ -604,7 +604,7 @@ class MaximusPrimeBase {
         dcmCollection.setPower(-1);
         Sleep(200);
         dcmCollection.setPower(0);
-        EncoderDrive(60, 40, .4, 4, -87);
+        EncoderDrive(60, 40, .4, 4, -81);
         dcmCollection.setPower(-1);
         EncoderDrive(-10, 92, .2, 3, -92);
         dcmCollection.setPower(-1);

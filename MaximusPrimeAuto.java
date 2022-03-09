@@ -1,6 +1,5 @@
 package org.firstinspires.ftc.teamcode;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
-import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
@@ -36,15 +35,22 @@ public class MaximusPrimeAuto extends LinearOpMode {
         });
 
         while (pipeline.getAnalysis() == 0 && cameraTimer.seconds()<7) {
+            base.tmrTeleop.seconds();
         }
         base.RetrieveShippingElementPosition();
         while (base.IsInitialized()) {
             base.AllianceDetermination();
+            telemetry.addData("Blue", SkystoneDeterminationPipeline.blueSquareActivated);
+            telemetry.addData("Green", SkystoneDeterminationPipeline.greenSquareActivated);
+            telemetry.addData("Blue?", pipeline.avg1);
+            telemetry.addData("Green?", pipeline.avg2);
+            telemetry.update();
         }
         waitForStart();
         base.RetrieveShippingElementPosition();
         base.Autonomous();
         while (opModeIsActive()) {
+            base.tmrTeleop.seconds();
         }
     }
     public static class SkystoneDeterminationPipeline extends OpenCvPipeline {
@@ -62,8 +68,8 @@ public class MaximusPrimeAuto extends LinearOpMode {
         static final Point REGION1_TOPLEFT_ANCHOR_POINT = new Point(130 ,100);
         static final Point REGION2_TOPLEFT_ANCHOR_POINT = new Point(130 ,290);
         // width: 40 height: 40
-        static final int REGION_WIDTH = 40;
-        static final int REGION_HEIGHT = 40; //65
+        static final int REGION_WIDTH = 55;
+        static final int REGION_HEIGHT = 55; //65
         Point region1_pointA = new Point(
                 REGION1_TOPLEFT_ANCHOR_POINT.x,
                 REGION1_TOPLEFT_ANCHOR_POINT.y);
