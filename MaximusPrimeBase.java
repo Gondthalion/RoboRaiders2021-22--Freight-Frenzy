@@ -35,8 +35,8 @@ class MaximusPrimeBase {
     ElapsedTime tmrCarouselTele = new ElapsedTime();
     /*          AUTONOMOUS AND TELEOP VARIABLES         */
     Alliance alliance = Alliance.BLUE1;
-    private enum Alliance{
-        RED1, RED2, BLUE1, BLUE2
+    public enum Alliance{
+        RED1, RED2, RED2_NO_BLOCK, BLUE1, BLUE2, BLUE2_NO_BLOCK
     }
     float IMUReading = 0;
     /*                TELEOP VARIABLES               */
@@ -134,16 +134,13 @@ class MaximusPrimeBase {
             bCollectedBlock = false;
         }
         if (bCollectedBlock) {
-            daLights.setPattern(RevBlinkinLedDriver.BlinkinPattern.BLUE);
+            daLights.setPattern(RevBlinkinLedDriver.BlinkinPattern.GREEN);
         } else if (tmrTeleop.seconds() > 85 && tmrTeleop.seconds() < 90) {
-            daLights.setPattern(RevBlinkinLedDriver.BlinkinPattern.HEARTBEAT_GRAY);
+            daLights.setPattern(RevBlinkinLedDriver.BlinkinPattern.HEARTBEAT_WHITE);
+        } else if (tmrTeleop.seconds() > 90) {
+            daLights.setPattern(RevBlinkinLedDriver.BlinkinPattern.RED);
         } else {
-            daLights.setPattern(RevBlinkinLedDriver.BlinkinPattern.WHITE);
-        }
-        if (opMode.gamepad2.dpad_left) {
-            daLights.setPattern(RevBlinkinLedDriver.BlinkinPattern.DARK_RED);
-        } else if (opMode.gamepad2.dpad_right) {
-            daLights.setPattern(RevBlinkinLedDriver.BlinkinPattern.BLUE);
+            daLights.setPattern(RevBlinkinLedDriver.BlinkinPattern.RED);
         }
     }
     public void CarouselTele() {
@@ -462,6 +459,9 @@ class MaximusPrimeBase {
         // Move backward to barcode
         EncoderDrive(-11,25,.3,2,0);
         // Strafe to the wall
+        dcmCapping.setPower(-1);
+        Sleep(1000);
+        dcmCapping.setPower(0);
         EncoderDriveSideways(18, 35,
                 .2, 2, 0);
         // Move forward to carousel
@@ -494,12 +494,18 @@ class MaximusPrimeBase {
             tmrGeneric.seconds();
         }
         dcmLift.setPower(0);
+        dcmCapping.setPower(1);
+        Sleep(1000);
+        dcmCapping.setPower(0);
         opMode.telemetry.addData("Heading: ", IMUReading);
         opMode.telemetry.update();
     }
     public void BlueOne() {                                                                         // Blue One
         // Move backward to barcode
         EncoderDrive(-11,25,.3,2,0);
+        dcmCapping.setPower(-1);
+        Sleep(1000);
+        dcmCapping.setPower(0);
         IMUTurn(-88, "r",.1f, 270);
         EncoderDrive(-22,25,.3,2,-88);
         IMUTurn(2, "l",.1f, 270);
@@ -535,6 +541,9 @@ class MaximusPrimeBase {
             tmrGeneric.seconds();
         }
         dcmLift.setPower(0);
+        dcmCapping.setPower(1);
+        Sleep(1000);
+        dcmCapping.setPower(0);
         opMode.telemetry.addData("Heading: ", IMUReading);
         opMode.telemetry.update();
     }
@@ -596,6 +605,31 @@ class MaximusPrimeBase {
             opMode.telemetry.update();
         }
     }
+    public void RedTwoNoBlock() {
+        // Move backward to barcode
+        EncoderDrive(-5, 20, .2, 2, 0);
+        //  ColorSensorReadings();
+        // Strafe to the front of the Alliance Shipping Hub
+        // EncoderDriveSideways(7, 34, .2, 2, 0);
+        IMUTurn(20, "l", .3f, 270);
+        // Move backward to the Alliance Shipping Hub
+        EncoderDrive(-19, 16, .2, 2, 20);
+        // Deliver the Pre-Loaded freight
+        DeliverBlock();
+        // Move away from the Alliance Shipping Hub
+        EncoderDrive(15, 15, .2,2,20);
+        // Lower the lift
+        dcmLift.setPower(-1);
+        while (dcmLift.getCurrentPosition() > 100 && ((LinearOpMode)opMode).opModeIsActive()) {
+            tmrGeneric.seconds();
+        }
+        dcmLift.setPower(0);
+        // Turn parallel to the wall
+        IMUTurn(90, "l",.1f, 270);
+        // Strafe into the wall
+        EncoderDriveSideways(6, 13, .2, 2, 90);
+        EncoderDrive(47, 48, .4, 4, 88);
+    }
     public void BlueTwo() {                                                                         // Blue Two
         // Move backward to barcode
         EncoderDrive(-5, 10, .2, 2, 0);
@@ -655,6 +689,33 @@ class MaximusPrimeBase {
             opMode.telemetry.addData("Heading: ", IMUReading);
             opMode.telemetry.update();
         }
+    }
+    public void BlueTwoNoBlock() {                                                                         // Blue Two
+        // Move backward to barcode
+        EncoderDrive(-5, 10, .2, 2, 0);
+        //  ColorSensorReadings();
+        // Strafe to the front of the Alliance Shipping Hub
+        // EncoderDriveSideways(7, 34, .2, 2, 0);
+        IMUTurn(-80, "r", .3f, 120);
+        // Move backward to the Alliance Shipping Hub
+        EncoderDrive(-28, 29, .2, 2, -87);
+        IMUTurn(-7, "l", .3f, 120);
+        EncoderDrive(-19.5, 18, .2, 2, 0);
+        // Deliver the Pre-Loaded freight
+        DeliverBlock();
+        // Move away from the Alliance Shipping Hub
+        EncoderDrive(17, 16, .2,2,0);
+        // Lower the lift
+        dcmLift.setPower(-1);
+        while (dcmLift.getCurrentPosition() > 100 && ((LinearOpMode)opMode).opModeIsActive()) {
+            tmrGeneric.seconds();
+        }
+        dcmLift.setPower(0);
+        // Turn parallel to the wall
+        IMUTurn(-85, "r",.1f, 120);
+        // Strafe into the wall
+        EncoderDriveSideways(-5, 6, .2, 2, -88);
+        EncoderDrive(60, 40, .4, 4, -81);
     }
     public void CarouselAuto() {                                                                    // Carousel Auto
         // If we are red
@@ -775,6 +836,10 @@ class MaximusPrimeBase {
             alliance = Alliance.RED1;
         } else if (opMode.gamepad1.y) {
             alliance = Alliance.RED2;
+        } else if (opMode.gamepad1.dpad_up) {
+            alliance = Alliance.BLUE2_NO_BLOCK;
+        } else if (opMode.gamepad1.dpad_down) {
+            alliance = Alliance.RED2_NO_BLOCK;
         }
         // Telemeter the position currently selected
         opMode.telemetry.addData("Starting auto position", alliance);

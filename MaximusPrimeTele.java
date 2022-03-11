@@ -18,6 +18,15 @@ public class MaximusPrimeTele extends OpMode {
         if (!timerRestarted) {
             base.tmrTeleop.reset();
             timerRestarted = true;
+            if (base.alliance == MaximusPrimeBase.Alliance.BLUE1) {
+                base.startingHeadingInRadians =  3.14159;
+            } else if (base.alliance == MaximusPrimeBase.Alliance.BLUE2) {
+                base.startingHeadingInRadians = 0;
+            } else if (base.alliance == MaximusPrimeBase.Alliance.RED1) {
+                base.startingHeadingInRadians = 1.5708;
+            } else if (base.alliance == MaximusPrimeBase.Alliance.RED2) {
+                base.startingHeadingInRadians = 0;
+            }
         }
         base.DriverControls();
         base.OperatorControls();
