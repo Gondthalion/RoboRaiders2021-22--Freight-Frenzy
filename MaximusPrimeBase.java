@@ -17,73 +17,82 @@ import org.firstinspires.ftc.robotcore.external.navigation.Orientation;
 
 class MaximusPrimeBase {
     OpMode opMode;
-    // Motor declaration
+    // This kind of creates the base for the motors to be set up on.
+    // dcm stands for direct current motor: which is the type we are using
     DcMotor dcmCollection, dcmLift, dcmSpinnerR,
             dcmDrivetrainLF, dcmDrivetrainRF, dcmDrivetrainLB, dcmDrivetrainRB, dcmCapping;
-    // Servo declaration
+    // This is just like the motor setup. cr stands for continuous rotation
     CRServo crsDelivery, crsCapping;
+    // This is the base for the lights on our robot
     RevBlinkinLedDriver daLights;
-    // IMU setup
+    // IMU setup. The first line sets up the actual IMU device.
+    // I'm not entirely certain what the second one sets up
     BNO055IMU imu;
     Orientation angles;
+    // This is the base for the color sensor for the lights on our robot
     NormalizedColorSensor csCollection;
-    // Timers
+    // These lines initialize timers
     ElapsedTime tmrGeneric = new ElapsedTime();
     ElapsedTime tmrTeleop = new ElapsedTime();
     ElapsedTime tmrIMU = new ElapsedTime();
     ElapsedTime tmrEncoderDrive = new ElapsedTime();
     ElapsedTime tmrCarouselTele = new ElapsedTime();
     /*          AUTONOMOUS AND TELEOP VARIABLES         */
+    // This is an enumerator. You can store any number of variables in them.
+    // They are useful because they are much easier to read than an int or series of bools.
+    // This one stores what autonomous path we should run.
     Alliance alliance = Alliance.BLUE1;
     public enum Alliance{
         RED1, RED2, RED2_NO_BLOCK, BLUE1, BLUE2, BLUE2_NO_BLOCK
     }
+    // The heading from the IMU
     float IMUReading = 0;
     /*                TELEOP VARIABLES               */
-    boolean bCollectedBlock = false;
-    double dCappingSpeed = 1;
-    boolean upFlagCapping = false;
+    boolean bCollectedBlock = false;                // To turn on lights if block collected
+    double dCappingSpeed = 1;                       // Power for capping arm
+    boolean upFlagCapping = false;                  // Variable for changing capping power
     boolean upPersistentCapping = false;
     boolean downFlagCapping = false;
     boolean downPersistentCapping = false;
-
-    double carouselTimerOffset = 0;
-    boolean autoTurnEnabled = false;
-    // Variables used in determining drivetrain speed
-    double drvTrnSpd = .75;
-    boolean upFlag = false;
+    boolean autoTurnEnabled = false;                // Disable driver controls if auto turning (in teleop)
+    double drvTrnSpd = .75;                         // Power for capping arm
+    boolean upFlag = false;                         // Variable for changing drivetrain power
     boolean upPersistent = false;
     boolean downFlag = false;
     boolean downPersistent = false;
-    // Variables used in field centric driver code
-    int count = 0;
+    int count = 0;                                  // Variable used in field centric driver code
     double[] angleTest = new double[10];
     double average;
     double correct;
-    double startingHeadingInRadians = 1.5708;
+    // YOU CAN CHANGE THIS TO CHANGE WHAT ANGLE THE FIELD CENTRIC CODE THINKS IS ZERO
+    double startingHeadingInRadians = 1.5708;       // THIS IS IN RADIANS.
     /*             AUTONOMOUS VARIABLES             */
-    double currentLinearPositionInInches = 0;
-    double amountOfVeer = 1;
-    double ticksPerInch = 42.8;
-    int leftSideEncoderAverage = 0;
+    double currentLinearPositionInInches = 0;       // Pos for encoder drives
+    double amountOfVeer = 1;                        // Veer for encoder drives
+    double ticksPerInch = 42.8;                     // Roughly motor tics per in on our robot (including gears)
+    int leftSideEncoderAverage = 0;                 // Exactly what it sounds like. Used for encoder drives
     int rightSideEncoderAverage = 0;
     int frontSideEncoderAverage = 0;
     int backSideEncoderAverage = 0;
-    double collectionDistanceSensorReading = 0;
+    double collectionDistanceSensorReading = 0;     // Used for lights
+    // This stores the desired level of the alliance shipping hub to score on in auto
     AutonomousTargetLevel autonomousTargetLevel = AutonomousTargetLevel.LOW;
     private enum AutonomousTargetLevel {
         HIGH, MIDDLE, LOW
     }
-    double carouselPower = 0;
+    double carouselPower = 0;                       // Carousel power. Like, I feel like that's pretty obvious
     // Link classes and run the configuration function
     public MaximusPrimeBase(OpMode theOpMode){
         opMode = theOpMode;
         Configuration();
     }
-    /*Teleop Functions*/
-    public void OperatorControls() {                                                                // Operator Controls
-        dcmCapping.setPower(opMode.gamepad2.left_trigger*dCappingSpeed - opMode.gamepad2.right_trigger*dCappingSpeed);
-
+    /* Teleop Functions */
+    /* These are the operator controls. They are really simple, but control about half of the robot */
+    public void OperatorControls() {                                                                        // Operator Controls
+        // Setting capping arm speed
+        dcmCapping.setPower(opMode.gamepad2.left_trigger*dCappingSpeed -
+                opMode.gamepad2.right_trigger*dCappingSpeed);
+        // Setting capping servo speed
         if (opMode.gamepad2.left_bumper) {
             crsCapping.setPower(-.25);
         } else if (opMode.gamepad2.right_bumper) {
@@ -91,11 +100,11 @@ class MaximusPrimeBase {
         } else {
             crsCapping.setPower(0);
         }
-        // Lift controls.
+        // Setting lift speed
         dcmLift.setPower(-opMode.gamepad2.left_stick_y);
-        // Collection controls.
+        // Setting collection speed
         dcmCollection.setPower(opMode.gamepad2.right_stick_y);
-        // Open/close delivery servo
+        // Setting deliver servo speed
         if (opMode.gamepad2.y) {
             crsDelivery.setPower(1);
         } else if (opMode.gamepad2.x) {
@@ -103,7 +112,7 @@ class MaximusPrimeBase {
         } else {
             crsDelivery.setPower(0);
         }
-
+        // Capping arm speed variability
         if (opMode.gamepad2.dpad_up){
             upFlagCapping = true;
         } else {
@@ -125,6 +134,7 @@ class MaximusPrimeBase {
             downPersistentCapping = true;
         }
     }
+    /* This function changes the color of the lights based on different criteria */
     public void Lights() {
         UpdateColorSensor();
         if (collectionDistanceSensorReading < 1.35) {
@@ -143,56 +153,27 @@ class MaximusPrimeBase {
             daLights.setPattern(RevBlinkinLedDriver.BlinkinPattern.RED);
         }
     }
-    public void CarouselTele() {
-        if (tmrCarouselTele.seconds()>1.2) {
-            carouselPower = 1;
-        } else {
-            carouselPower = .35;
-        }
+    /* These are the driver controls. They are really simple, and control the carousel and tele imu turn */
+    public void DriverControls() {                                                                  // Driver controls
+        // Sets the carousel motor power high if the right button is pressed
+        // and low if the left is pressed
         if (alliance == Alliance.BLUE1 || alliance == Alliance.BLUE2) {
             if (opMode.gamepad1.left_bumper) {
-                dcmSpinnerR.setPower(carouselPower);
+                dcmSpinnerR.setPower(.3);
+            } else if (opMode.gamepad1.right_bumper) {
+                dcmSpinnerR.setPower(1);
             } else {
                 dcmSpinnerR.setPower(0);
-                tmrCarouselTele.reset();
             }
         } else {
             if (opMode.gamepad1.left_bumper) {
-                dcmSpinnerR.setPower(-carouselPower);
+                dcmSpinnerR.setPower(-.3);
+            } else if (opMode.gamepad1.right_bumper) {
+                dcmSpinnerR.setPower(-1);
             } else {
                 dcmSpinnerR.setPower(0);
-                tmrCarouselTele.reset();
             }
         }
-    }
-    public void DriverControls() {                                                                  // Driver controls
-        CarouselTele();
-        TeleIMUTurn();
-        // Speed variation for the drivetrain.
-        if (opMode.gamepad1.dpad_up){
-            upFlag = true;
-        } else {
-            upFlag = false;
-            upPersistent = false;
-        }
-        if (upFlag && !upPersistent) {
-            if (drvTrnSpd < 1){drvTrnSpd += .1;}
-            upPersistent = true;
-        }
-        if (opMode.gamepad1.dpad_down){
-            downFlag = true;
-        } else {
-            downFlag = false;
-            downPersistent = false;
-        }
-        if (downFlag && !downPersistent) {
-            if (drvTrnSpd > .1){
-                drvTrnSpd -= .1;
-            }
-            downPersistent = true;
-        }
-    }
-    void TeleIMUTurn() {                                                                            // Teleop IMU turn
         // Update our current heading
         angles = imu.getAngularOrientation(AxesReference.INTRINSIC,
                 AxesOrder.ZYX, AngleUnit.DEGREES);
@@ -220,16 +201,47 @@ class MaximusPrimeBase {
         else {
             autoTurnEnabled = false;
         }
+        // Speed variation for the drivetrain
+        if (opMode.gamepad1.dpad_up){
+            upFlag = true;
+        } else {
+            upFlag = false;
+            upPersistent = false;
+        }
+        if (upFlag && !upPersistent) {
+            if (drvTrnSpd < 1){drvTrnSpd += .1;}
+            upPersistent = true;
+        }
+        if (opMode.gamepad1.dpad_down){
+            downFlag = true;
+        } else {
+            downFlag = false;
+            downPersistent = false;
+        }
+        if (downFlag && !downPersistent) {
+            if (drvTrnSpd > .1){
+                drvTrnSpd -= .1;
+            }
+            downPersistent = true;
+        }
     }
+    /* This is where the field centric code is actually based.
+    I didn't make it, but it's dope */
     public void UpdateDriveTrain() {                                                                // Field-centric driver code
+        // Update the imu heading
         angles = imu.getAngularOrientation
                 (AxesReference.INTRINSIC, AxesOrder.ZYX, AngleUnit.RADIANS);
+        // Fancy math to map the value of the x and y parts of the joystick as polar coordinates.
+        // Polar coordinates are a angle value and distance value.
+        // In this case, angle determines the robot's movement angle and the distance determines power
         double speed = Math.hypot
                 (opMode.gamepad1.left_stick_x, opMode.gamepad1.left_stick_y);
         double angle = Math.atan2
                 (opMode.gamepad1.left_stick_y, opMode.gamepad1.left_stick_x) - (Math.PI/4);
         angle += angles.firstAngle - (Math.PI)/2 - startingHeadingInRadians;
+        // This uses the position of the other joystick to find how fast it should be turning
         double turnPower = opMode.gamepad1.right_stick_x;
+        // Calculates the power to apply to each motor based on the math above
         if(turnPower == 0){
             if (count < 10) {
                 angleTest[count] = angle;
@@ -251,6 +263,7 @@ class MaximusPrimeBase {
                 count = 0;
             }
         }
+        // If the robot is not auto turning, moved based on joystick input
         if (!autoTurnEnabled) {
             dcmDrivetrainLF.setPower((((speed * -(Math.sin(angle)) + turnPower))) * drvTrnSpd);
             dcmDrivetrainLB.setPower((((speed * -(Math.cos(angle)) + turnPower))) * drvTrnSpd);
@@ -259,6 +272,8 @@ class MaximusPrimeBase {
         }
     }
     /*Autonomous Functions*/
+    /* Encoder drive for autonomous. It's FAR from perfect.
+    Give yourself more than a week to figure out the logic you want to use */
     public void EncoderDrive(double inToMove, double maxSpeedDistance,                              // Encoder drive
                              double minSpeed, float timeOut, int headingOffset) {
         // Reset the stall out timer
@@ -353,9 +368,10 @@ class MaximusPrimeBase {
         // Reset encoders after movement
         ResetEncoders();
     }
+    /* This is seriously crappy programming. There is no need to have this be a separate function.
+    Anyway, see the encoder drive function since it's pretty much the same exact thing */
     public void EncoderDriveSideways(double inToMove, double maxSpeedDistance,                      // Encoder Drive Sideways
                                      double minSpeed, float timeOut, int headingOffset) {
-        // SEE ENCODERDRIVE FOR DOCUMENTATION
         tmrEncoderDrive.reset();
         ResetEncoders();
 
@@ -424,6 +440,7 @@ class MaximusPrimeBase {
         stopDrivetrain();
         ResetEncoders();
     }
+    /* IMU turn for autonomous. It uses the IMU sensor built into the control hub to turn */
     void IMUTurn(float targetAngle, String leftOrRight,                                             // IMU Turn
                  float minSpeed, float maxSpeedAngle) {
         // Reset the stall out timer
@@ -455,122 +472,74 @@ class MaximusPrimeBase {
         // Stopping the motors once we completed our turn
         stopDrivetrain();
     }
+    /* Autonomous paths */
     public void RedOne() {                                                                          // Red One
-        // Move backward to barcode
         EncoderDrive(-11,25,.3,2,0);
-        // Strafe to the wall
-        dcmCapping.setPower(-1);
-        Sleep(1000);
-        dcmCapping.setPower(0);
         EncoderDriveSideways(18, 35,
                 .2, 2, 0);
-        // Move forward to carousel
         EncoderDrive(5.5,27,.3,2,0);
-        // Deliver the duck
         CarouselAuto();
-        // Move backward past Storage Unit
         EncoderDrive(-41, 49, .2, 2 , 2);
-        // Strafe away from the wall
         EncoderDriveSideways(-5, 12,
                 .2, 2, 0);
-        // Turn towards Alliance Shipping Hub
         IMUTurn(-88, "r",.1f, 270);
-        // Move forward to Alliance Shipping Hub
         EncoderDrive(-24.5, 37, .2, 2, -83);
-        // Deliver the Pre-Loaded Box leaving the lift raised
         DeliverBlock();
-        // Back up near the wall
         EncoderDrive(27.5, 37, .2, 2, -90);
-        // Turn to be parallel with the wall
         IMUTurn(1, "l",.2f, 270);
-        // Strafe to the wall
         EncoderDriveSideways(8, 11,
                 .2, 2, 0);
-        // Move forward into Storage Unit
         EncoderDrive(14, 22, .2, 2,1);
-        // Lower the lift
         dcmLift.setPower(-1);
         while (dcmLift.getCurrentPosition() > 100 && ((LinearOpMode)opMode).opModeIsActive()) {
             tmrGeneric.seconds();
         }
         dcmLift.setPower(0);
-        dcmCapping.setPower(1);
-        Sleep(1000);
-        dcmCapping.setPower(0);
         opMode.telemetry.addData("Heading: ", IMUReading);
         opMode.telemetry.update();
     }
     public void BlueOne() {                                                                         // Blue One
         // Move backward to barcode
         EncoderDrive(-11,25,.3,2,0);
-        dcmCapping.setPower(-1);
-        Sleep(1000);
-        dcmCapping.setPower(0);
         IMUTurn(-88, "r",.1f, 270);
         EncoderDrive(-22,25,.3,2,-88);
         IMUTurn(2, "l",.1f, 270);
         EncoderDriveSideways(-5, 20,
                 .2, 2, 0);
-        EncoderDrive(8, 10, .2, 2 , 0);
-        // Move forward to carousel
-        // Deliver the duck
+        EncoderDrive(9, 10, .2, 2 , 0);
         CarouselAuto();
-        // Move backward past Storage Unit
-        EncoderDrive(-38, 49, .2, 2 , -2);
-        // Strafe away from the wall
+        EncoderDrive(-42.5, 49, .2, 2 , -2);
         EncoderDriveSideways(5, 20,
                 .2, 2, 0);
-        // Turn towards Alliance Shipping Hub
         IMUTurn(90, "l",.1f, 270);
-        // Move forward to Alliance Shipping Hub
-        EncoderDrive(-25.5, 37, .2, 2, 92);
-        // Deliver the Pre-Loaded Box leaving the lift raised
+        EncoderDrive(-27, 37, .2, 2, 92);
         DeliverBlock();
-        // Back up near the wall
         EncoderDrive(26.5, 37, .2, 2, 90);
-        // Turn to be parallel with the wall
         IMUTurn(6, "r",.2f, 270);
-        // Strafe to the wall
         EncoderDriveSideways(-8, 25,
                 .2, 2, 3);
-        // Move forward into Storage Unit
-        EncoderDrive(11, 22, .2, 2,3);
-        // Lower the lift
+        EncoderDrive(13, 22, .2, 2,3);
         dcmLift.setPower(-1);
         while (dcmLift.getCurrentPosition() > 100 && ((LinearOpMode)opMode).opModeIsActive()) {
             tmrGeneric.seconds();
         }
         dcmLift.setPower(0);
-        dcmCapping.setPower(1);
-        Sleep(1000);
-        dcmCapping.setPower(0);
         opMode.telemetry.addData("Heading: ", IMUReading);
         opMode.telemetry.update();
     }
     public void RedTwo() {                                                                          // Red Two
-        // Move backward to barcode
         EncoderDrive(-5, 20, .2, 2, 0);
-        //  ColorSensorReadings();
-        // Strafe to the front of the Alliance Shipping Hub
-        // EncoderDriveSideways(7, 34, .2, 2, 0);
         IMUTurn(20, "l", .3f, 270);
-        // Move backward to the Alliance Shipping Hub
         EncoderDrive(-19, 16, .2, 2, 20);
-        // Deliver the Pre-Loaded freight
         DeliverBlock();
-        // Move away from the Alliance Shipping Hub
         EncoderDrive(15, 15, .2,2,20);
-        // Lower the lift
         dcmLift.setPower(-1);
         while (dcmLift.getCurrentPosition() > 100 && ((LinearOpMode)opMode).opModeIsActive()) {
             tmrGeneric.seconds();
         }
         dcmLift.setPower(0);
-        // Turn parallel to the wall
         IMUTurn(90, "l",.1f, 270);
-        // Strafe into the wall
         EncoderDriveSideways(6, 13, .2, 2, 90);
-        // Move into the Warehouse
         dcmCollection.setPower(1);
         Sleep(200);
         dcmCollection.setPower(-1);
@@ -600,62 +569,25 @@ class MaximusPrimeBase {
         } else {
             dcmCollection.setPower(0);
             EncoderDrive(15, 40, .2, 2, 86);
-            // Strafe away from the wall
             opMode.telemetry.addData("Heading: ", IMUReading);
             opMode.telemetry.update();
         }
     }
-    public void RedTwoNoBlock() {
-        // Move backward to barcode
-        EncoderDrive(-5, 20, .2, 2, 0);
-        //  ColorSensorReadings();
-        // Strafe to the front of the Alliance Shipping Hub
-        // EncoderDriveSideways(7, 34, .2, 2, 0);
-        IMUTurn(20, "l", .3f, 270);
-        // Move backward to the Alliance Shipping Hub
-        EncoderDrive(-19, 16, .2, 2, 20);
-        // Deliver the Pre-Loaded freight
-        DeliverBlock();
-        // Move away from the Alliance Shipping Hub
-        EncoderDrive(15, 15, .2,2,20);
-        // Lower the lift
-        dcmLift.setPower(-1);
-        while (dcmLift.getCurrentPosition() > 100 && ((LinearOpMode)opMode).opModeIsActive()) {
-            tmrGeneric.seconds();
-        }
-        dcmLift.setPower(0);
-        // Turn parallel to the wall
-        IMUTurn(90, "l",.1f, 270);
-        // Strafe into the wall
-        EncoderDriveSideways(6, 13, .2, 2, 90);
-        EncoderDrive(47, 48, .4, 4, 88);
-    }
     public void BlueTwo() {                                                                         // Blue Two
-        // Move backward to barcode
         EncoderDrive(-5, 10, .2, 2, 0);
-        //  ColorSensorReadings();
-        // Strafe to the front of the Alliance Shipping Hub
-        // EncoderDriveSideways(7, 34, .2, 2, 0);
         IMUTurn(-80, "r", .3f, 120);
-        // Move backward to the Alliance Shipping Hub
         EncoderDrive(-28, 29, .2, 2, -87);
         IMUTurn(-7, "l", .3f, 120);
         EncoderDrive(-19.5, 18, .2, 2, 0);
-        // Deliver the Pre-Loaded freight
         DeliverBlock();
-        // Move away from the Alliance Shipping Hub
         EncoderDrive(17, 16, .2,2,0);
-        // Lower the lift
         dcmLift.setPower(-1);
         while (dcmLift.getCurrentPosition() > 100 && ((LinearOpMode)opMode).opModeIsActive()) {
             tmrGeneric.seconds();
         }
         dcmLift.setPower(0);
-        // Turn parallel to the wall
         IMUTurn(-85, "r",.1f, 120);
-        // Strafe into the wall
         EncoderDriveSideways(-5, 6, .2, 2, -88);
-        // Move into the Warehouse
         dcmCollection.setPower(1);
         Sleep(200);
         dcmCollection.setPower(-1);
@@ -685,38 +617,11 @@ class MaximusPrimeBase {
         } else {
             dcmCollection.setPower(0);
             EncoderDrive(15, 40, .2, 2, -86);
-            // Strafe away from the wall
             opMode.telemetry.addData("Heading: ", IMUReading);
             opMode.telemetry.update();
         }
     }
-    public void BlueTwoNoBlock() {                                                                         // Blue Two
-        // Move backward to barcode
-        EncoderDrive(-5, 10, .2, 2, 0);
-        //  ColorSensorReadings();
-        // Strafe to the front of the Alliance Shipping Hub
-        // EncoderDriveSideways(7, 34, .2, 2, 0);
-        IMUTurn(-80, "r", .3f, 120);
-        // Move backward to the Alliance Shipping Hub
-        EncoderDrive(-28, 29, .2, 2, -87);
-        IMUTurn(-7, "l", .3f, 120);
-        EncoderDrive(-19.5, 18, .2, 2, 0);
-        // Deliver the Pre-Loaded freight
-        DeliverBlock();
-        // Move away from the Alliance Shipping Hub
-        EncoderDrive(17, 16, .2,2,0);
-        // Lower the lift
-        dcmLift.setPower(-1);
-        while (dcmLift.getCurrentPosition() > 100 && ((LinearOpMode)opMode).opModeIsActive()) {
-            tmrGeneric.seconds();
-        }
-        dcmLift.setPower(0);
-        // Turn parallel to the wall
-        IMUTurn(-85, "r",.1f, 120);
-        // Strafe into the wall
-        EncoderDriveSideways(-5, 6, .2, 2, -88);
-        EncoderDrive(60, 40, .4, 4, -81);
-    }
+    /* Function to turn the carousel in autonomous */
     public void CarouselAuto() {                                                                    // Carousel Auto
         // If we are red
         if (alliance == Alliance.RED1 || alliance == Alliance.RED2) {
@@ -735,6 +640,7 @@ class MaximusPrimeBase {
             dcmSpinnerR.setPower(0);
         }
     }
+    /* Function to deliver the freight in autonomous */
     public void DeliverBlock() {                                                                    // Deliver Block
         // Reset the lift's home position
         dcmLift.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
@@ -785,6 +691,7 @@ class MaximusPrimeBase {
             dcmLift.setPower(0);
         }
     }
+    /* This is where you give every motor, servo, etc. a name as well a few other things */
     public void Configuration() {                                                                   // Configuration
         dcmCollection = opMode.hardwareMap.dcMotor.get("collectionM");
         dcmLift = opMode.hardwareMap.dcMotor.get("liftM");
@@ -817,14 +724,18 @@ class MaximusPrimeBase {
         imu = opMode.hardwareMap.get(BNO055IMU.class, "imu");
         imu.initialize(parameters);
     }
+    /* Update the color sensor. It used to be beneficial to have this be its own function,
+    but it really doesn't need to be now */
     public void UpdateColorSensor() {
         collectionDistanceSensorReading = ((DistanceSensor) csCollection).getDistance(DistanceUnit.INCH);
     }
+    /* Display stuff on the driver station */
     public void Telemetry() {                                                                       // Telemetry
         opMode.telemetry.addData("Drivetrain speed: ", drvTrnSpd);
         opMode.telemetry.addData("Capping speed: ", dCappingSpeed);
         opMode.telemetry.update();
     }
+    /* Choose the robot's auto path */
     public void AllianceDetermination() {                                                           // Alliance determination
         // Choosing our starting position for autonomous and teleop.
         // X for Blue 1, A for Blue 2, etc.
@@ -845,6 +756,7 @@ class MaximusPrimeBase {
         opMode.telemetry.addData("Starting auto position", alliance);
         opMode.telemetry.update();
     }
+    /* Reset the drivetrain's motor encoders */
     public void ResetEncoders() {
         // Function to reset encoders
         dcmDrivetrainLF.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
@@ -856,8 +768,8 @@ class MaximusPrimeBase {
         dcmDrivetrainLB.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
         dcmDrivetrainRB.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
     }
+    /* Play the autonomous based on what path was chosen */
     public void Autonomous() {
-        // Play the autonomous based on what path was chosen
         if (alliance == Alliance.RED1) {
             RedOne();
         } else if (alliance == Alliance.BLUE1) {
@@ -888,14 +800,16 @@ class MaximusPrimeBase {
         dcmDrivetrainRF.setPower(0);
         dcmDrivetrainRB.setPower(0);
     }
-    public void ResetHeading(){ // Resets the imu heading by adding/subtracting from itself
-        if (opMode.gamepad1.b){ // In case something goes wrong, driver can reposition the robot and reset the heading during teleop
+    /* Resets the imu heading by subtracting its current heading from its future headings */
+    public void ResetHeading(){
+        if (opMode.gamepad1.b){
             angles = imu.getAngularOrientation
                     (AxesReference.INTRINSIC, AxesOrder.ZYX, AngleUnit.DEGREES);
             IMUReading = (angles.firstAngle);
             startingHeadingInRadians = (Math.toRadians(IMUReading) + 1.5708);
         }
     }
+    /* Recall the the shipping element data from the autonomous class */
     public void RetrieveShippingElementPosition() {
         if (alliance == Alliance.BLUE1 || alliance == Alliance.BLUE2) {
             if (MaximusPrimeAuto.SkystoneDeterminationPipeline.blueSquareActivated) {
@@ -917,4 +831,5 @@ class MaximusPrimeBase {
         opMode.telemetry.addData("Pos", autonomousTargetLevel);
         opMode.telemetry.update();
     }
+    // https://www.youtube.com/watch?v=HPk-VhRjNI8&list=PL3KnTfyhrIlcudeMemKd6rZFGDWyK23vx&index=1
 }
